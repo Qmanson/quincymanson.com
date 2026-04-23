@@ -26,7 +26,13 @@
             background: url(media/computer.png) no-repeat center / 39em;
             height: 32em;
         }
-        .back-button {
+        .navbar {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            margin: 0 5em;
+        }
+        .back-button, .next-button {
             margin-top: 8em;
         }
     </style>
@@ -38,8 +44,8 @@
     <div class="display">
         <div class="screen">
             <div class="navbar">
-                <button disabled class="back-button"></button>
-                <button class="next-button"></button>
+                <button disabled class="back-button"><-</button>
+                <button class="next-button">-></button>
             </div>
             <h1>WELCOME</h1>
         </div>
