@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --yes)",
+      "Bash(mkdir -p public/media)",
+      "Bash(cp media/computer.png public/media/)",
+      "Bash(cp media/space.jpg public/media/)",
+      "Bash(cp media/favicon.png public/favicon.png)",
+      "Bash(rm -rf media index.html)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(cp middleware.ts proxy.ts)",
+      "Bash(rm middleware.ts)"
+    ]
+  }
+}

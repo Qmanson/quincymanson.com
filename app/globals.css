@@ -1,0 +1,232 @@
+@import "tailwindcss";
+
+/* ════════════════════════════════════════════════════════════
+   90s RETRO INTERNET — geocities meets old mac
+   ════════════════════════════════════════════════════════════ */
+
+:root {
+  --paper: #f4ecd8;          /* aged cream */
+  --paper-shadow: #d8cfb8;
+  --ink: #1a1a2e;            /* deep navy ink */
+  --link: #0000ee;           /* classic unvisited blue */
+  --link-visited: #551a8b;   /* classic visited purple */
+  --link-active: #ff0000;
+  --accent: #c41e3a;         /* dim retro red */
+  --hot: #ff6b35;            /* warning orange */
+  --bevel-light: #ffffff;
+  --bevel-dark: #707070;
+  --bevel-darker: #404040;
+  --window-bg: #c0c0c0;      /* classic system gray */
+  --titlebar: #000080;       /* classic navy title bar */
+  --titlebar-text: #ffffff;
+}
+
+html, body {
+  background: #000;
+}
+
+body {
+  background-image: url('/media/space.jpg');
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: center;
+  color: var(--ink);
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: none;
+  text-rendering: geometricPrecision;
+}
+
+/* Links — classic underlined blue/purple */
+a {
+  color: var(--link);
+  text-decoration: underline;
+}
+a:visited {
+  color: var(--link-visited);
+}
+a:active {
+  color: var(--link-active);
+}
+a:hover {
+  color: var(--accent);
+  background: #ffff00;
+}
+
+/* ── chunky beveled buttons ─────────────────────────────────── */
+
+button, .btn {
+  font-family: 'Times New Roman', Times, serif;
+  background: var(--window-bg);
+  color: var(--ink);
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-darker) var(--bevel-darker) var(--bevel-light);
+  padding: 3px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 1px 1px 0 var(--bevel-darker);
+}
+button:hover, .btn:hover {
+  background: #d4d0c8;
+}
+button:active:not(:disabled), .btn:active:not(:disabled) {
+  border-color: var(--bevel-darker) var(--bevel-light) var(--bevel-light) var(--bevel-darker);
+  box-shadow: inset 1px 1px 0 var(--bevel-darker);
+}
+button:disabled {
+  color: #808080;
+  text-shadow: 1px 1px 0 var(--bevel-light);
+  cursor: not-allowed;
+}
+
+/* form fields — sunken bevel */
+input[type="text"], input[type="email"], input[type="password"], input[type="url"],
+input[type="date"], input[type="number"], textarea, select {
+  font-family: 'Courier New', Courier, monospace;
+  background: #ffffff;
+  color: var(--ink);
+  border: 2px solid;
+  border-color: var(--bevel-darker) var(--bevel-light) var(--bevel-light) var(--bevel-darker);
+  padding: 3px 5px;
+  font-size: 14px;
+}
+input:focus, textarea:focus, select:focus {
+  outline: 1px dotted var(--ink);
+  outline-offset: -4px;
+}
+
+/* ── 90s "window" container ─────────────────────────────────── */
+
+.window {
+  background: var(--paper);
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-darker) var(--bevel-darker) var(--bevel-light);
+  box-shadow: 2px 2px 0 var(--bevel-darker), 4px 4px 0 rgba(0,0,0,0.25);
+  padding: 0;
+}
+.window-titlebar {
+  background: linear-gradient(to right, var(--titlebar), #1084d0);
+  color: var(--titlebar-text);
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: bold;
+  font-size: 13px;
+  padding: 3px 8px;
+  letter-spacing: 0.5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.window-body {
+  padding: 16px 20px;
+}
+
+/* prose styles for blog post markdown */
+.prose {
+  color: var(--ink);
+  max-width: 65ch;
+  font-size: 16px;
+  line-height: 1.7;
+}
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  font-family: 'Times New Roman', Times, serif;
+  color: var(--accent);
+  font-weight: bold;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.prose h1 { font-size: 1.875rem; border-bottom: 3px double var(--ink); padding-bottom: 4px; }
+.prose h2 { font-size: 1.5rem; border-bottom: 1px solid var(--ink); padding-bottom: 2px; }
+.prose h3 { font-size: 1.25rem; }
+.prose p { margin-bottom: 1em; }
+.prose a { color: var(--link); }
+.prose a:visited { color: var(--link-visited); }
+.prose blockquote {
+  border-left: 4px solid var(--accent);
+  padding-left: 1em;
+  color: #444;
+  font-style: italic;
+  margin: 1em 0;
+  background: rgba(196, 30, 58, 0.05);
+  padding: 0.5em 1em;
+}
+.prose code {
+  font-family: 'Courier New', Courier, monospace;
+  background: #fff;
+  padding: 1px 4px;
+  border: 1px solid var(--bevel-dark);
+  font-size: 0.9em;
+}
+.prose pre {
+  background: #fff;
+  padding: 12px;
+  border: 2px solid;
+  border-color: var(--bevel-darker) var(--bevel-light) var(--bevel-light) var(--bevel-darker);
+  overflow-x: auto;
+  margin: 1em 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.prose pre code {
+  background: none; padding: 0; border: none; font-size: inherit;
+}
+.prose ul, .prose ol { padding-left: 2em; margin-bottom: 1em; }
+.prose ul { list-style-type: square; }
+.prose ol { list-style-type: decimal; }
+.prose img {
+  border: 4px ridge var(--bevel-darker);
+  margin: 1em 0;
+  max-width: 100%;
+  background: #fff;
+  padding: 4px;
+}
+.prose hr {
+  border: none;
+  border-top: 2px dashed var(--accent);
+  margin: 2em 0;
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  border: 2px solid var(--ink);
+}
+.prose th, .prose td { border: 1px solid var(--ink); padding: 4px 8px; }
+.prose th { background: var(--titlebar); color: #fff; font-family: 'Courier New', monospace; }
+
+/* utility: courier label */
+.label {
+  font-family: 'Courier New', Courier, monospace;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* blink animation — use sparingly! */
+@keyframes blink { 50% { opacity: 0; } }
+.blink { animation: blink 1s step-end infinite; }
+
+/* marquee-ish hover for fun */
+.under-construction {
+  background: repeating-linear-gradient(45deg, #ffeb3b, #ffeb3b 10px, #000 10px, #000 20px);
+  color: #000;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  padding: 2px 8px;
+  display: inline-block;
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 16px; height: 16px; background: var(--window-bg); }
+::-webkit-scrollbar-track {
+  background: var(--window-bg);
+  border: 1px solid;
+  border-color: var(--bevel-darker) var(--bevel-light) var(--bevel-light) var(--bevel-darker);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--window-bg);
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-darker) var(--bevel-darker) var(--bevel-light);
+}
