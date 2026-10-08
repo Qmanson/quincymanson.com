@@ -2,11 +2,13 @@ import { notFound } from 'next/navigation'
 import { qPage } from '@/lib/q/db'
 import { DOMAIN_INFO } from '@/lib/q/domains'
 import { loadMissionViews } from '@/lib/q/missions'
+import { viewLogs } from '@/lib/q/logview'
 import { addDays, today } from '@/lib/q/time'
 import { DOMAINS, type Domain } from '@/lib/q/types'
 import AddFab from '../../_components/AddFab'
 import MissionCard from '../../missions/MissionCard'
 import DomainLists from './DomainLists'
+import PeoplePanel from './PeoplePanel'
 
 export default async function DomainPage({ params }: { params: Promise<{ domain: string }> }) {
   const { domain } = await params
@@ -31,7 +33,10 @@ export default async function DomainPage({ params }: { params: Promise<{ domain:
   const { data: logs } = typeIds.length
     ? await db.from('q_logs').select('*').in('log_type_id', typeIds).order('logged_on', { ascending: false }).order('created_at', { ascending: false }).limit(25)
     : { data: [] }
-  const views = await loadMissionViews(db, missions ?? [])
+  const [views, logViews] = await Promise.all([
+    loadMissionViews(db, missions ?? []),
+    viewLogs(db, logs ?? [], logTypes ?? []),
+  ])
 
   return (
     <main className="q-main" data-d={d}>
@@ -42,7 +47,8 @@ export default async function DomainPage({ params }: { params: Promise<{ domain:
 
       {(missions ?? []).map(m => <MissionCard key={m.id} m={m} v={views.get(m.id)} compact />)}
 
-      <DomainLists routines={routines ?? []} tasks={tasks ?? []} logTypes={logTypes ?? []} logs={logs ?? []} />
+      <DomainLists routines={routines ?? []} tasks={tasks ?? []} logTypes={logTypes ?? []} logs={logViews} />
+      {d === 'crew' && <PeoplePanel db={db} />}
       <AddFab domain={d} />
     </main>
   )

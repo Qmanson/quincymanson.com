@@ -38,9 +38,9 @@ export function Seg<T extends string>({
 
 export function DomainPicker({ initial }: { initial?: Domain }) {
   return (
-    <label className="q-field">
+    <div className="q-field">
       domain
       <Seg name="domain" colored initial={initial} options={DOMAINS.map(d => ({ value: d, label: d }))} />
-    </label>
+    </div>
   )
 }

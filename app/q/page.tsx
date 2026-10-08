@@ -5,6 +5,7 @@ import {
   daysBetween,
   formatDow,
   formatShort,
+  isSunday,
   monthStart,
   periodEnd,
   periodStart,
@@ -109,6 +110,13 @@ export default async function Today() {
         <div className="q-tiny q-dim">{formatDow(t)} · {formatShort(t)}</div>
         <h1 className="q-h1">today</h1>
       </div>
+
+      {isSunday(t) && (
+        <Link href="/q/review/weekly" className="q-panel q-panel-body" style={{ display: 'flex', justifyContent: 'space-between', borderColor: 'var(--phosphor)' }}>
+          <span className="q-pos">$ payday — weekly review is open</span>
+          <span className="q-pos">→</span>
+        </Link>
+      )}
 
       <MissionStrip missions={missionsRes.data ?? []} />
 

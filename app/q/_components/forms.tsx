@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import type { Domain, QLogType, QRoutine, QTask } from '@/lib/q/types'
+import { useEffect, useState } from 'react'
+import { SUBSTANCES, type Domain, type LogKind, type QLogType, type QRoutine, type QTask } from '@/lib/q/types'
 import { TASK_SIZES } from '@/lib/q/points'
 import { today } from '@/lib/q/time'
 import {
   addLog,
+  logFormData,
   createLogType,
   createRoutine,
   createTask,
@@ -15,6 +16,7 @@ import {
 } from '../actions'
 import QForm from './Form'
 import { DomainPicker, Seg } from './Pickers'
+import { LiftRows, MediaPicker, PeoplePicker, PhotoInput, Stars, TagInput } from './log/inputs'
 
 type Done = { onDone?: () => void }
 
@@ -29,7 +31,7 @@ export function TaskForm({ task, domain, onDone }: Done & { task?: QTask; domain
         <input name="title" required defaultValue={task?.title} placeholder="fix closet light" autoFocus={!task} />
       </label>
       <DomainPicker initial={task?.domain ?? domain} />
-      <label className="q-field">
+      <div className="q-field">
         size
         <Seg
           name="size"
@@ -40,7 +42,7 @@ export function TaskForm({ task, domain, onDone }: Done & { task?: QTask; domain
           }))}
           onChange={k => setValue(TASK_SIZES[k])}
         />
-      </label>
+      </div>
       <div className="q-form-row">
         <label className="q-field">
           Q$
@@ -84,7 +86,7 @@ export function RoutineForm({ routine, domain, onDone }: Done & { routine?: QRou
         <input name="title" required defaultValue={routine?.title} placeholder="floss" autoFocus={!routine} />
       </label>
       <DomainPicker initial={routine?.domain ?? domain} />
-      <label className="q-field">
+      <div className="q-field">
         how often
         <Seg
           name="cadence"
@@ -95,7 +97,7 @@ export function RoutineForm({ routine, domain, onDone }: Done & { routine?: QRou
             if (!routine) setValue(DEFAULT_VALUE[c])
           }}
         />
-      </label>
+      </div>
       {cadence === 'interval' && (
         <label className="q-field">
           every how many days
@@ -128,25 +130,40 @@ export function RoutineForm({ routine, domain, onDone }: Done & { routine?: QRou
 
 // ── log types + logs ────────────────────────────────────────
 
+const KIND_OPTS: { value: LogKind; label: string }[] = [
+  { value: 'basic', label: 'amount + note' },
+  { value: 'run', label: 'distance + time' },
+  { value: 'lift', label: 'workouts' },
+  { value: 'movie', label: 'film' },
+  { value: 'book', label: 'book' },
+  { value: 'album', label: 'album' },
+  { value: 'event', label: 'event + people' },
+  { value: 'photo', label: 'photo' },
+  { value: 'substance', label: 'substances' },
+]
+
 export function LogTypeForm({ logType, domain, onDone }: Done & { logType?: QLogType; domain?: Domain }) {
+  const [kind, setKind] = useState<LogKind>(logType?.kind ?? 'basic')
   return (
     <QForm action={logType ? updateLogType.bind(null, logType.id) : createLogType} onDone={onDone}>
-      <div className="q-form-row" style={{ gridTemplateColumns: '64px 1fr' }}>
-        <label className="q-field">
-          icon
-          <input name="icon" defaultValue={logType?.icon ?? ''} placeholder="🏃" maxLength={4} />
-        </label>
-        <label className="q-field">
-          name
-          <input name="name" required defaultValue={logType?.name} placeholder="run" autoFocus={!logType} />
-        </label>
-      </div>
+      <label className="q-field">
+        name
+        <input name="name" required defaultValue={logType?.name} placeholder="bike" autoFocus={!logType} />
+      </label>
       <DomainPicker initial={logType?.domain ?? domain} />
+      <div className="q-field">
+        what you fill in
+        <Seg name="kind" initial={kind} options={KIND_OPTS} onChange={setKind} />
+      </div>
       <div className="q-form-row">
-        <label className="q-field">
-          unit (optional)
-          <input name="unit" defaultValue={logType?.unit ?? ''} placeholder="mi" />
-        </label>
+        {kind === 'basic' || kind === 'run' ? (
+          <label className="q-field">
+            unit (optional)
+            <input name="unit" defaultValue={logType?.unit ?? (kind === 'run' ? 'mi' : '')} placeholder="mi" />
+          </label>
+        ) : (
+          <span />
+        )}
         <label className="q-field">
           Q$ per log
           <input name="value" type="number" inputMode="numeric" defaultValue={logType?.value ?? 20} />
@@ -156,28 +173,110 @@ export function LogTypeForm({ logType, domain, onDone }: Done & { logType?: QLog
   )
 }
 
+type Aux = Awaited<ReturnType<typeof logFormData>>
+
 export function LogForm({ logType, onDone }: Done & { logType: QLogType }) {
+  const [aux, setAux] = useState<Aux>({ workouts: [], people: [], tags: [] })
+  useEffect(() => {
+    let live = true
+    logFormData(logType.id).then(a => live && setAux(a)).catch(() => {})
+    return () => { live = false }
+  }, [logType.id])
+
+  const k = logType.kind
+  const isMedia = k === 'movie' || k === 'book' || k === 'album'
+  const day = (
+    <label className="q-field">
+      day
+      <input name="logged_on" type="date" defaultValue={today()} />
+    </label>
+  )
+
   return (
     <QForm action={addLog} onDone={onDone} submit={`log${logType.value ? ` +${logType.value}` : ''}`}>
       <input type="hidden" name="log_type_id" value={logType.id} />
-      <div className="q-form-row">
-        {logType.unit ? (
-          <label className="q-field">
-            {logType.unit}
-            <input name="amount" type="number" inputMode="decimal" step="any" autoFocus />
-          </label>
-        ) : (
-          <span />
-        )}
-        <label className="q-field">
-          day
-          <input name="logged_on" type="date" defaultValue={today()} />
-        </label>
-      </div>
-      <label className="q-field">
-        note
-        <textarea name="note" rows={2} placeholder={logType.unit ? '' : 'title, thoughts…'} autoFocus={!logType.unit} />
-      </label>
+
+      {k === 'basic' && (
+        <>
+          <div className="q-form-row">
+            {logType.unit ? (
+              <label className="q-field">
+                {logType.unit}
+                <input name="amount" type="number" inputMode="decimal" step="any" autoFocus />
+              </label>
+            ) : <span />}
+            {day}
+          </div>
+          <label className="q-field">note<textarea name="note" rows={2} autoFocus={!logType.unit} /></label>
+        </>
+      )}
+
+      {k === 'run' && (
+        <>
+          <div className="q-form-row">
+            <label className="q-field">
+              {logType.unit ?? 'mi'}
+              <input name="amount" type="number" inputMode="decimal" step="any" required autoFocus />
+            </label>
+            <label className="q-field">
+              time
+              <input name="time" inputMode="numeric" placeholder="mm:ss" pattern="[0-9:]*" />
+            </label>
+          </div>
+          {day}
+        </>
+      )}
+
+      {k === 'lift' && (
+        <>
+          <LiftRows workouts={aux.workouts} />
+          {day}
+        </>
+      )}
+
+      {k === 'substance' && (
+        <>
+          <div className="q-seg">
+            {SUBSTANCES.map(sub => (
+              <label key={sub} className="q-check-chip">
+                <input type="checkbox" name="substances" value={sub} />
+                <span>{sub}</span>
+              </label>
+            ))}
+          </div>
+          {day}
+          <label className="q-field">note<textarea name="note" rows={2} /></label>
+        </>
+      )}
+
+      {isMedia && (
+        <>
+          <MediaPicker kind={k} name="media" />
+          <div className="q-field">rating<Stars name="rating" /></div>
+          <div className="q-field">tags<TagInput name="tags" suggestions={aux.tags} /></div>
+          <label className="q-field">review<textarea name="note" rows={3} /></label>
+          {day}
+        </>
+      )}
+
+      {k === 'event' && (
+        <>
+          <label className="q-field">what<input name="title" placeholder="chicago local music night" autoFocus /></label>
+          <div className="q-field">who was there<PeoplePicker people={aux.people} /></div>
+          <div className="q-field">tags<TagInput name="tags" suggestions={aux.tags} /></div>
+          {day}
+          <label className="q-field">note<textarea name="note" rows={2} /></label>
+        </>
+      )}
+
+      {k === 'photo' && (
+        <>
+          <PhotoInput name="photo_path" folder="logs" />
+          <div className="q-field">tags<TagInput name="tags" suggestions={aux.tags} /></div>
+          {day}
+          <label className="q-field">note<textarea name="note" rows={2} /></label>
+        </>
+      )}
     </QForm>
   )
 }

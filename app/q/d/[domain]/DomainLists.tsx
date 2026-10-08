@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { QLog, QLogType, QRoutine, QTask } from '@/lib/q/types'
-import { missPenalty } from '@/lib/q/points'
+import type { QLogType, QRoutine, QTask } from '@/lib/q/types'
+import type { LogView } from '@/lib/q/logview'
+import { missPenalty, starText } from '@/lib/q/points'
 import { relativeDay } from '@/lib/q/time'
 import Sheet from '../../_components/Sheet'
 import CheckRow from '../../_components/CheckRow'
 import { LogForm, LogTypeForm, RoutineForm, TaskForm } from '../../_components/forms'
 import { toast } from '../../_components/Toast'
+import { Cover } from '../../_components/log/inputs'
 import { deleteLog, deleteTask, setLogTypeActive, setRoutineActive, toggleTask } from '../../actions'
 
 const CADENCE_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'interval'] as const
@@ -28,12 +30,11 @@ export default function DomainLists({
   routines: QRoutine[]
   tasks: QTask[]
   logTypes: QLogType[]
-  logs: QLog[]
+  logs: LogView[]
 }) {
   const [edit, setEdit] = useState<Edit>(null)
   const [pending, start] = useTransition()
   const close = () => setEdit(null)
-  const typeName = new Map(logTypes.map(lt => [lt.id, lt]))
 
   function run(fn: () => Promise<unknown>) {
     start(async () => {
@@ -114,7 +115,6 @@ export default function DomainLists({
           <div className="q-chips">
             {logTypes.map(lt => (
               <button key={lt.id} type="button" className={`q-chip ${lt.active ? '' : 'q-faint'}`} onClick={() => setEdit({ kind: 'log', item: lt })}>
-                {lt.icon && <span>{lt.icon}</span>}
                 {lt.name}
               </button>
             ))}
@@ -122,28 +122,36 @@ export default function DomainLists({
         ) : (
           <p className="q-empty">no log types yet</p>
         )}
-        {logs.map(l => {
-          const lt = typeName.get(l.log_type_id)
-          return (
-            <div key={l.id} className="q-row" style={{ minHeight: 44 }}>
-              <span className="q-row-main">
-                <span className="q-row-title" style={{ display: 'block' }}>
-                  {lt?.icon} {lt?.name}
-                  {l.amount !== null && <span className="q-pos"> {l.amount}{lt?.unit ? ` ${lt.unit}` : ''}</span>}
-                </span>
-                <span className="q-row-sub">{relativeDay(l.logged_on)}{l.note ? ` · ${l.note}` : ''}</span>
+        {logs.map(l => (
+          <div key={l.id} className="q-row" style={{ alignItems: 'flex-start' }}>
+            {l.mediaKind && <Cover url={l.cover} kind={l.mediaKind} size={40} />}
+            {l.photo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <a href={l.photo} target="_blank" rel="noreferrer"><img className="q-thumb" src={l.photo} alt="" /></a>
+            )}
+            <span className="q-row-main" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span className="q-row-title">
+                {l.kind === 'photo' || l.kind === 'basic' || l.kind === 'run' || l.kind === 'lift' || l.kind === 'substance'
+                  ? l.type
+                  : l.title}
               </span>
-              <button
-                type="button"
-                className="q-faint q-small"
-                disabled={pending}
-                onClick={() => confirm('delete this log?') && run(() => deleteLog(l.id))}
-              >
-                ✕
-              </button>
-            </div>
-          )
-        })}
+              {l.detail && <span className="q-small" style={{ whiteSpace: 'normal' }}>{l.detail}</span>}
+              {l.rating !== null && <span className="q-rating">{starText(l.rating)}</span>}
+              {l.people.length > 0 && <span className="q-small q-dim">with {l.people.join(', ')}</span>}
+              {l.note && <span className="q-small q-dim" style={{ whiteSpace: 'pre-wrap' }}>{l.note}</span>}
+              {l.tags.length > 0 && <span className="q-tags">{l.tags.map(t => <span key={t}>#{t}</span>)}</span>}
+              <span className="q-tiny q-faint">{relativeDay(l.logged_on)}</span>
+            </span>
+            <button
+              type="button"
+              className="q-faint q-small"
+              disabled={pending}
+              onClick={() => confirm('delete this log?') && run(() => deleteLog(l.id))}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
       </section>
 
       <Sheet open={edit?.kind === 'routine'} onClose={close} title="edit routine">

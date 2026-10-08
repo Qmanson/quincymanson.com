@@ -13,7 +13,7 @@ export default function QuickLog({ logTypes }: { logTypes: QLogType[] }) {
       <div className="q-chips">
         {logTypes.map(lt => (
           <button key={lt.id} type="button" className="q-chip" data-d={lt.domain} onClick={() => setOpen(lt)}>
-            {lt.icon ? <span>{lt.icon}</span> : <span className="q-dot" />}
+            <span className="q-dot" />
             {lt.name}
           </button>
         ))}

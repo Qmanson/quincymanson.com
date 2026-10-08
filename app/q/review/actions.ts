@@ -21,6 +21,7 @@ export async function completeReview(cadence: ReviewCadence, f: FormData): Promi
 
   const { data: past } = await db.from('q_reviews').select('period_start').eq('cadence', cadence).not('completed_at', 'is', null)
   const period_start = reviewPeriod(cadence, new Set((past ?? []).map(r => r.period_start)))
+  if (!period_start) throw new Error('reviews open on sundays')
 
   const answers: Record<string, string> = {}
   for (const k of ['grade', 'wins', 'misses', 'next']) {

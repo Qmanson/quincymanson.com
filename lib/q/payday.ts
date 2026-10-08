@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types'
 import type { Domain, QLedger } from './types'
 import { DECAY_PER_WEEK } from './points'
-import { addDays, monthStart, quarterStart, today, weekStart, weeksBetween, yearStart } from './time'
+import { addDays, addMonths, daysBetween, isSunday, monthStart, quarterStart, today, weekStart, weeksBetween, yearStart } from './time'
 
 type DB = SupabaseClient<Database>
 
@@ -55,8 +55,13 @@ export async function payStub(db: DB, t = today()): Promise<Stub> {
     weeks.set(w, (weeks.get(w) ?? 0) + r.amount)
   }
 
+  // Each week is paid on its own Sunday. Anything still pending after that
+  // loses DECAY_PER_WEEK per week — except stragglers from a week that was
+  // already claimed (e.g. logged on Sunday after payday).
+  const { data: paid } = await db.from('q_paydays').select('week_start')
+  const claimedWeeks = new Set((paid ?? []).map(p => p.week_start))
   const lateWeeks = [...weeks.entries()].flatMap(([week, net]) => {
-    const weeksLate = Math.max(0, weeksBetween(week, t) - 1)
+    const weeksLate = claimedWeeks.has(week) ? 0 : Math.max(0, weeksBetween(week, t))
     if (!weeksLate || net <= 0) return []
     return [{ week, net, weeksLate, decay: Math.round(net * Math.min(1, DECAY_PER_WEEK * weeksLate)) }]
   })
@@ -123,17 +128,34 @@ const START: Record<ReviewCadence, (d: string) => string> = {
   yearly: yearStart,
 }
 
-/** Days into a new period during which you can still review the last one. */
-const CATCH_UP: Record<ReviewCadence, number> = { weekly: 2, monthly: 7, quarterly: 14, yearly: 31 }
+const MONTHS = { weekly: 0, monthly: 1, quarterly: 3, yearly: 12 } as const
+
+/** Days into a new period on which you can still review the last one. */
+const CATCH_UP: Record<ReviewCadence, number> = { weekly: 0, monthly: 7, quarterly: 14, yearly: 31 }
 
 /**
- * Which period a review right now is for: the previous one if we're early
- * in a new period and it hasn't been reviewed, otherwise the current one.
+ * Reviews only happen on Sundays. Returns the period a review today is for,
+ * or null if there's nothing to review today:
+ *  - weekly: every Sunday, for the week ending today
+ *  - monthly / quarterly / yearly: the last Sunday of the period, or the
+ *    first Sunday(s) after it if that one was missed
  */
-export function reviewPeriod(cadence: ReviewCadence, done: Set<string>, t = today()): string {
+export function reviewPeriod(cadence: ReviewCadence, done: Set<string>, t = today()): string | null {
+  if (!isSunday(t)) return null
+  if (cadence === 'weekly') return weekStart(t)
   const current = START[cadence](t)
+  const end = addDays(addMonths(current, MONTHS[cadence]), -1)
+  if (daysBetween(t, end) < 7) return current
   const prev = START[cadence](addDays(current, -1))
-  const into = Math.round((Date.parse(t) - Date.parse(current)) / 86_400_000)
-  if (into < CATCH_UP[cadence] && !done.has(prev)) return prev
-  return current
+  if (daysBetween(current, t) < CATCH_UP[cadence] && !done.has(prev)) return prev
+  return null
+}
+
+/** Next day (from t, inclusive) a review of this cadence opens. */
+export function nextReviewDay(cadence: ReviewCadence, t = today()): string {
+  for (let i = 0; i < 400; i++) {
+    const d = addDays(t, i)
+    if (reviewPeriod(cadence, new Set(), d)) return d
+  }
+  return t
 }

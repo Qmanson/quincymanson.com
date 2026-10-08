@@ -62,3 +62,7 @@ export function formatQ(n: number): string {
 
 /** Missions tied to the current yearly theme or quarterly sub-theme pay extra. */
 export const THEME_BONUS = 1.25
+
+export function starText(r: number): string {
+  return '★'.repeat(Math.floor(r)) + (r % 1 ? '½' : '')
+}

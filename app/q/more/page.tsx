@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { qPage } from '@/lib/q/db'
-import { reviewPeriod, type ReviewCadence } from '@/lib/q/payday'
-import { formatShort, quarterStart, today, yearStart } from '@/lib/q/time'
+import { nextReviewDay, reviewPeriod, type ReviewCadence } from '@/lib/q/payday'
+import { formatDow, formatShort, quarterStart, today, yearStart } from '@/lib/q/time'
 import { signOut } from '@/app/(site)/login/actions'
 
 const REVIEWS: { c: ReviewCadence; blurb: string }[] = [
@@ -43,13 +43,16 @@ export default async function More() {
         {REVIEWS.map(({ c, blurb }) => {
           const d = done(c)
           const p = reviewPeriod(c, d, t)
-          const isDone = d.has(p)
+          const isDone = p !== null && d.has(p)
+          const opens = p ? null : nextReviewDay(c, t)
           return (
             <Link key={c} href={`/q/review/${c}`} className={`q-row ${isDone ? 'is-done' : ''}`}>
               <span className={`q-box ${isDone ? 'is-on' : ''}`}>{isDone ? '✓' : ''}</span>
               <span className="q-row-main">
                 <span className="q-row-title" style={{ display: 'block' }}>{c}</span>
-                <span className="q-row-sub">{blurb} · {formatShort(p)}</span>
+                <span className="q-row-sub">
+                  {blurb} · {p ? (isDone ? 'done' : <span className="q-pos">open today</span>) : `${formatDow(opens!)} ${formatShort(opens!)}`}
+                </span>
               </span>
               <span className="q-dim">→</span>
             </Link>

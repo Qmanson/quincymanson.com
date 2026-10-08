@@ -5,7 +5,9 @@ import { qAction } from '@/lib/q/db'
 import { settle } from '@/lib/q/ledger'
 import { lateValue, missPenalty, TASK_SIZES } from '@/lib/q/points'
 import { periodStart, today } from '@/lib/q/time'
-import { DOMAINS, type Cadence, type Domain } from '@/lib/q/types'
+import { BUCKET, saveMedia, type MediaHit } from '@/lib/q/media'
+import type { Database } from '@/lib/types'
+import { DOMAINS, LOG_KINDS, type Cadence, type Domain, type LiftSet, type LogKind } from '@/lib/q/types'
 
 function done() {
   revalidatePath('/q', 'layout')
@@ -208,14 +210,19 @@ export async function deleteTask(id: string) {
 
 // ── logs ────────────────────────────────────────────────────
 
+function logKind(f: FormData): LogKind {
+  const k = str(f, 'kind') ?? 'basic'
+  return (LOG_KINDS as readonly string[]).includes(k) ? (k as LogKind) : 'basic'
+}
+
 export async function createLogType(f: FormData) {
   const db = await qAction()
   const { error } = await db.from('q_log_types').insert({
     domain: domain(f),
     name: required(f, 'name'),
+    kind: logKind(f),
     unit: str(f, 'unit'),
     value: int(f, 'value') ?? 0,
-    icon: str(f, 'icon'),
   })
   if (error) throw error
   done()
@@ -226,9 +233,9 @@ export async function updateLogType(id: string, f: FormData) {
   const { error } = await db.from('q_log_types').update({
     domain: domain(f),
     name: required(f, 'name'),
+    kind: logKind(f),
     unit: str(f, 'unit'),
     value: int(f, 'value') ?? 0,
-    icon: str(f, 'icon'),
   }).eq('id', id)
   if (error) throw error
   done()
@@ -240,18 +247,98 @@ export async function setLogTypeActive(id: string, active: boolean) {
   done()
 }
 
+function json<T>(f: FormData, k: string): T | null {
+  const v = str(f, k)
+  if (!v) return null
+  try { return JSON.parse(v) as T } catch { return null }
+}
+
+/** "1:02:03", "42:10" or "42" (minutes) → seconds. */
+function duration(v: string | null): number | null {
+  if (!v) return null
+  const parts = v.split(':').map(Number)
+  if (parts.some(n => !Number.isFinite(n))) return null
+  if (parts.length === 1) return Math.round(parts[0] * 60)
+  return Math.round(parts.reduce((s, n) => s * 60 + n, 0))
+}
+
+function tags(f: FormData): string[] {
+  return [...new Set((str(f, 'tags') ?? '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]
+}
+
 export async function addLog(f: FormData): Promise<number> {
   const db = await qAction()
   const typeId = required(f, 'log_type_id')
   const { data: lt, error } = await db.from('q_log_types').select('*').eq('id', typeId).single()
   if (error) throw error
   const logged_on = str(f, 'logged_on') ?? today()
-  const { data: log, error: e } = await db
-    .from('q_logs')
-    .insert({ log_type_id: typeId, logged_on, amount: num(f, 'amount'), note: str(f, 'note') })
-    .select('id')
-    .single()
+
+  const row: Database['public']['Tables']['q_logs']['Insert'] = {
+    log_type_id: typeId,
+    logged_on,
+    amount: num(f, 'amount'),
+    note: str(f, 'note'),
+    tags: tags(f),
+  }
+
+  switch (lt.kind) {
+    case 'run':
+      row.note = null
+      row.data = { seconds: duration(str(f, 'time')) }
+      break
+    case 'lift': {
+      const sets = (json<LiftSet[]>(f, 'sets') ?? []).filter(s => s.workout?.trim())
+      if (!sets.length) throw new Error('add at least one workout')
+      const names = [...new Set(sets.map(s => s.workout.trim().toLowerCase()))]
+      await db.from('q_workouts').upsert(names.map(name => ({ name })), { onConflict: 'name', ignoreDuplicates: true })
+      row.amount = null
+      row.note = null
+      row.data = { sets: sets.map(s => ({ ...s, workout: s.workout.trim().toLowerCase() })) }
+      break
+    }
+    case 'substance': {
+      const picked = f.getAll('substances').filter((v): v is string => typeof v === 'string')
+      if (!picked.length) throw new Error('pick at least one')
+      row.amount = null
+      row.data = { substances: picked }
+      break
+    }
+    case 'movie':
+    case 'book':
+    case 'album': {
+      const hit = json<MediaHit>(f, 'media')
+      if (!hit) throw new Error(`pick a ${lt.kind}`)
+      row.media_id = await saveMedia(db, { ...hit, kind: lt.kind })
+      row.rating = num(f, 'rating')
+      row.amount = null
+      break
+    }
+    case 'event':
+      row.amount = null
+      row.data = { title: str(f, 'title') }
+      break
+    case 'photo':
+      row.photo_path = str(f, 'photo_path')
+      if (!row.photo_path) throw new Error('add a photo')
+      row.amount = null
+      break
+  }
+
+  const { data: log, error: e } = await db.from('q_logs').insert(row).select('id').single()
   if (e) throw e
+
+  if (lt.kind === 'event') {
+    const ids = json<string[]>(f, 'people_ids') ?? []
+    const newNames = (json<string[]>(f, 'new_people') ?? []).map(n => n.trim()).filter(Boolean)
+    if (newNames.length) {
+      const { data: made } = await db.from('q_people').insert(newNames.map(name => ({ name }))).select('id')
+      ids.push(...(made ?? []).map(p => p.id))
+    }
+    if (ids.length) {
+      await db.from('q_log_people').insert([...new Set(ids)].map(person_id => ({ log_id: log.id, person_id })))
+    }
+  }
+
   if (lt.value) {
     await settle(db, { source: 'log', source_id: log.id, domain: lt.domain, note: lt.name, occurred_on: logged_on }, lt.value)
   }
@@ -261,7 +348,26 @@ export async function addLog(f: FormData): Promise<number> {
 
 export async function deleteLog(id: string) {
   const db = await qAction()
+  const { data: log } = await db.from('q_logs').select('photo_path').eq('id', id).maybeSingle()
+  if (log?.photo_path) await db.storage.from(BUCKET).remove([log.photo_path])
   await settle(db, { source: 'log', source_id: id }, 0)
   await db.from('q_logs').delete().eq('id', id)
   done()
+}
+
+/** Suggestions for the log sheet: known workouts, people and tags. */
+export async function logFormData(logTypeId: string) {
+  const db = await qAction()
+  const [{ data: workouts }, { data: people }, { data: recent }] = await Promise.all([
+    db.from('q_workouts').select('name').order('name'),
+    db.from('q_people').select('id, name').order('name'),
+    db.from('q_logs').select('tags').eq('log_type_id', logTypeId).order('created_at', { ascending: false }).limit(200),
+  ])
+  const counts = new Map<string, number>()
+  for (const r of recent ?? []) for (const t of r.tags) counts.set(t, (counts.get(t) ?? 0) + 1)
+  return {
+    workouts: (workouts ?? []).map(w => w.name),
+    people: people ?? [],
+    tags: [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([t]) => t),
+  }
 }

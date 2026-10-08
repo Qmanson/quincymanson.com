@@ -42,31 +42,31 @@ export default function NewMission({
           <DomainPicker />
 
           <div className="q-form-row">
-            <label className="q-field">
+            <div className="q-field">
               for the
               <Seg name="period" initial={period} options={[{ value: 'month', label: 'month' }, { value: 'quarter', label: 'quarter' }]} onChange={setPeriod} />
-            </label>
-            <label className="q-field">
+            </div>
+            <div className="q-field">
               which
               <Seg name="which" initial="this" options={[{ value: 'this', label: labels[0] }, { value: 'next', label: labels[1] }]} />
-            </label>
+            </div>
           </div>
 
-          <label className="q-field">
+          <div className="q-field">
             type
             <Seg name="kind" initial={kind} options={KIND_OPTS} onChange={setKind} />
             <span className="q-small q-dim" style={{ textTransform: 'none', letterSpacing: 0 }}>
               {KIND_OPTS.find(k => k.value === kind)?.hint}
             </span>
-          </label>
+          </div>
 
           {kind === 'streak' && (
             <>
               <div className="q-form-row">
-                <label className="q-field">
+                <div className="q-field">
                   check in
                   <Seg name="streak_cadence" initial="daily" options={[{ value: 'daily', label: 'daily' }, { value: 'weekly', label: 'weekly' }]} />
-                </label>
+                </div>
                 <label className="q-field">
                   times per period
                   <input name="streak_per_period" type="number" inputMode="numeric" min={1} defaultValue={1} />
@@ -143,7 +143,7 @@ export default function NewMission({
                 limit (fail at)
                 <input name="strike_limit" type="number" inputMode="numeric" min={1} defaultValue={3} />
               </label>
-              <label className="q-field">
+              <div className="q-field">
                 each strike
                 <Seg
                   name="strike_formula"
@@ -151,7 +151,7 @@ export default function NewMission({
                   onChange={setFormula}
                   options={[{ value: 'halving', label: '½' }, { value: 'linear', label: '−%' }, { value: 'custom', label: 'table' }]}
                 />
-              </label>
+              </div>
             </div>
             {formula === 'halving' && <p className="q-small q-dim">1000 → 500 → 250 → fail</p>}
             {formula === 'linear' && (

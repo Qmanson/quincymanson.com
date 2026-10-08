@@ -79,10 +79,17 @@ export type QTask = {
   created_at: string
 }
 
+export const LOG_KINDS = ['basic', 'lift', 'run', 'substance', 'movie', 'book', 'album', 'event', 'photo'] as const
+export type LogKind = (typeof LOG_KINDS)[number]
+export type MediaKind = 'movie' | 'book' | 'album'
+
+export const SUBSTANCES = ['weed', 'alcohol', 'nicotine', 'psychedelics', 'stimulants'] as const
+
 export type QLogType = {
   id: string
   domain: Domain
   name: string
+  kind: LogKind
   unit: string | null
   value: number
   icon: string | null
@@ -98,6 +105,35 @@ export type QLog = {
   amount: number | null
   note: string | null
   data: Json
+  media_id: string | null
+  rating: number | null
+  tags: string[]
+  photo_path: string | null
+  created_at: string
+}
+
+export type LiftSet = { workout: string; sets: number | null; reps: number | null; weight: number | null }
+
+export type QMedia = {
+  id: string
+  kind: MediaKind
+  source: string
+  source_id: string
+  title: string
+  creator: string | null
+  year: number | null
+  cover_url: string | null
+  created_at: string
+}
+
+export type QLogPerson = {
+  log_id: string
+  person_id: string
+}
+
+export type QWorkout = {
+  id: string
+  name: string
   created_at: string
 }
 
@@ -250,6 +286,8 @@ export type QReward = {
   repeatable: boolean
   cooldown_days: number | null
   url: string | null
+  image_path: string | null
+  image_url: string | null
   notes: string | null
   status: 'available' | 'bought' | 'retired'
   sort_order: number
@@ -276,8 +314,11 @@ export type QTables = {
   q_routine_checks: QTable<QRoutineCheck, 'id' | 'created_at'>
   q_projects: QTable<QProject, 'id' | 'status' | 'sort_order' | 'created_at'>
   q_tasks: QTable<QTask, 'id' | 'value' | 'sort_order' | 'created_at'>
-  q_log_types: QTable<QLogType, 'id' | 'value' | 'active' | 'sort_order' | 'created_at'>
-  q_logs: QTable<QLog, 'id' | 'logged_on' | 'data' | 'created_at'>
+  q_log_types: QTable<QLogType, 'id' | 'kind' | 'value' | 'active' | 'sort_order' | 'created_at'>
+  q_logs: QTable<QLog, 'id' | 'logged_on' | 'data' | 'tags' | 'created_at'>
+  q_media: QTable<QMedia, 'id' | 'created_at'>
+  q_log_people: QTable<QLogPerson>
+  q_workouts: QTable<QWorkout, 'id' | 'created_at'>
   q_people: QTable<QPerson, 'id' | 'circle' | 'created_at'>
   q_interactions: QTable<QInteraction, 'id' | 'happened_on' | 'created_at'>
   q_interaction_people: QTable<QInteractionPerson>

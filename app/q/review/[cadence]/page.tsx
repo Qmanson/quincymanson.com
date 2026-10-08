@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation'
 import { qPage } from '@/lib/q/db'
-import { payStub, reviewPeriod, type ReviewCadence } from '@/lib/q/payday'
+import { nextReviewDay, payStub, reviewPeriod, type ReviewCadence } from '@/lib/q/payday'
 import { formatQ, REVIEW_BONUS } from '@/lib/q/points'
-import { addDays, addMonths, formatDow, formatShort, quarterStart, today, yearStart } from '@/lib/q/time'
+import { addDays, addMonths, formatDow, formatShort, monthStart, quarterStart, today, weekStart, yearStart } from '@/lib/q/time'
 import ReviewForm from './ReviewForm'
 import ThemeForm from './ThemeForm'
 
@@ -28,7 +28,10 @@ export default async function Review({ params }: { params: Promise<{ cadence: st
     .order('period_start', { ascending: false })
     .limit(12)
   const completed = new Set((past ?? []).filter(r => r.completed_at).map(r => r.period_start))
-  const start = reviewPeriod(cadence, completed, t)
+  const reviewing = reviewPeriod(cadence, completed, t)
+  const CURRENT = { weekly: weekStart, monthly: monthStart, quarterly: quarterStart, yearly: yearStart }[cadence]
+  const start = reviewing ?? CURRENT(t)
+  const opens = reviewing ? null : nextReviewDay(cadence, t)
   const end = SPAN[cadence](start)
   const existing = (past ?? []).find(r => r.period_start === start)
   const isDone = !!existing?.completed_at
@@ -62,7 +65,7 @@ export default async function Review({ params }: { params: Promise<{ cadence: st
     })
   }
 
-  const stub = cadence === 'weekly' && !isDone ? await payStub(db, t) : null
+  const stub = cadence === 'weekly' && !isDone ? await payStub(db, t) : null // preview even before sunday
 
   const [{ data: yearTheme }, { data: quarterTheme }] = await Promise.all([
     db.from('q_themes').select('*').eq('scope', 'year').eq('period_start', yearStart(t)).maybeSingle(),
@@ -151,7 +154,14 @@ export default async function Review({ params }: { params: Promise<{ cadence: st
         </section>
       )}
 
-      {isDone ? (
+      {opens ? (
+        <section className="q-panel">
+          <div className="q-panel-body" style={{ textAlign: 'center' }}>
+            <div className="q-tiny q-dim">reviews are on sundays</div>
+            <div className="q-display" style={{ fontSize: 26, marginTop: 4 }}>opens {formatDow(opens)} {formatShort(opens)}</div>
+          </div>
+        </section>
+      ) : isDone ? (
         <section className="q-panel">
           <div className="q-panel-title"><span>▸ <b className="q-pos">done ✓</b></span></div>
           <div className="q-panel-body q-small q-dim" style={{ whiteSpace: 'pre-wrap' }}>

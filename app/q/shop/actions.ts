@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { qAction } from '@/lib/q/db'
 import { add, getBalances } from '@/lib/q/ledger'
+import { BUCKET } from '@/lib/q/media'
 import { addDays, dateOf, today } from '@/lib/q/time'
 import { DOMAINS, type Domain, type QReward } from '@/lib/q/types'
 
@@ -28,7 +29,10 @@ function fields(f: FormData) {
     repeatable: f.get('repeatable') === 'on',
     cooldown_days: Number(str(f, 'cooldown_days')) || null,
     url: str(f, 'url'),
+    image_url: str(f, 'image_url'),
     notes: str(f, 'notes'),
+    // only replace an uploaded picture when a new one was picked
+    ...(str(f, 'image_path') ? { image_path: str(f, 'image_path') } : {}),
   }
 }
 
@@ -43,6 +47,14 @@ export async function updateReward(id: string, f: FormData) {
   const db = await qAction()
   const { error } = await db.from('q_rewards').update(fields(f)).eq('id', id)
   if (error) throw error
+  revalidatePath('/q', 'layout')
+}
+
+export async function removeRewardImage(id: string) {
+  const db = await qAction()
+  const { data: r } = await db.from('q_rewards').select('image_path').eq('id', id).single()
+  if (r?.image_path) await db.storage.from(BUCKET).remove([r.image_path])
+  await db.from('q_rewards').update({ image_path: null, image_url: null }).eq('id', id)
   revalidatePath('/q', 'layout')
 }
 

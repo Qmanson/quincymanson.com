@@ -109,3 +109,7 @@ export function relativeDay(d: string, from: string = today()): string {
 export function dateOf(ts: string | Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(ts))
 }
+
+export function isSunday(d: string): boolean {
+  return toDate(d).getUTCDay() === 0
+}

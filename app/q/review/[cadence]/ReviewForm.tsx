@@ -37,10 +37,10 @@ export default function ReviewForm({ cadence }: { cadence: ReviewCadence }) {
           submit={cadence === 'weekly' ? '$ complete & claim payday' : `complete · +${REVIEW_BONUS[cadence]}`}
         >
           {cadence === 'monthly' && (
-            <label className="q-field">
+            <div className="q-field">
               budget grade
               <Seg name="grade" options={['A', 'B', 'C', 'D', 'F'].map(g => ({ value: g, label: g }))} />
-            </label>
+            </div>
           )}
           {PROMPTS[cadence].map(p => (
             <label key={p.k} className="q-field">

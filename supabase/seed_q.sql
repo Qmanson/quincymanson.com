@@ -1,6 +1,6 @@
 -- ============================================================
 -- q starter data, pulled from the planning notes.
--- Run ONCE in the Supabase SQL editor after 003_q_app.sql.
+-- Run ONCE in the Supabase SQL editor after 003_q_app.sql and 004.
 -- Every value and price is a placeholder — tune them in the app.
 -- Rule of thumb: a solid day ≈ 100 Q$, a solid week ≈ 1,000 Q$,
 -- and wants are priced at roughly 20 Q$ per real dollar.
@@ -38,22 +38,21 @@ insert into q_routines (domain, title, cadence, interval_days, value, sort_order
   ('body', 'haircut',          'interval', 42,  75, 3),
   ('admn', 'dentist',          'interval', 182, 200, 4);
 
--- ── log types ───────────────────────────────────────────────
-insert into q_log_types (domain, name, unit, value, icon, sort_order) values
-  ('body', 'lift',        'min', 25, '', 1),
-  ('body', 'run',         'mi',  25, '', 2),
-  ('body', 'bike',        'mi',  20, '', 3),
-  ('body', 'walk',        'mi',  10, '', 4),
-  ('body', 'meditate',    'min', 15, '', 5),
-  ('body', 'substances',  null,  0,  '',  6),
-  ('arts', 'movie',       null,  15, '', 7),
-  ('arts', 'book finished', null, 100, '', 8),
-  ('arts', 'album',       null,  10, '', 9),
-  ('city', 'event',       null,  30, '', 10),
-  ('styl', 'fit pic',     null,  15, '', 11),
-  ('crew', 'letter sent', null,  40, '', 12),
-  ('crew', 'kind act',    null,  25, '', 13),
-  ('home', 'laundry load', null, 0,  '', 14);
+-- ── log types (needs 004 for `kind`) ───────────────────────
+insert into q_log_types (domain, name, kind, unit, value, sort_order) values
+  ('body', 'lift',        'lift',      null,  25, 1),
+  ('body', 'run',         'run',       'mi',  25, 2),
+  ('body', 'bike',        'basic',     'mi',  20, 3),
+  ('body', 'meditate',    'basic',     'min', 15, 4),
+  ('body', 'substances',  'substance', null,  0,  5),
+  ('arts', 'movie',       'movie',     null,  15, 6),
+  ('arts', 'book',        'book',      null,  100, 7),
+  ('arts', 'album',       'album',     null,  10, 8),
+  ('city', 'event',       'event',     null,  30, 9),
+  ('styl', 'fit pic',     'photo',     null,  15, 10),
+  ('crew', 'letter sent', 'basic',     null,  40, 11),
+  ('crew', 'kind act',    'basic',     null,  25, 12),
+  ('home', 'laundry load','basic',     null,  0,  13);
 
 -- ── shop: purchase wants ────────────────────────────────────
 insert into q_rewards (title, category, domain, cost) values
