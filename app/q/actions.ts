@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { qAction } from '@/lib/q/db'
 import { settle } from '@/lib/q/ledger'
 import { lateValue, missPenalty, TASK_SIZES } from '@/lib/q/points'
-import { periodStart, today } from '@/lib/q/time'
+import { addDays, periodEnd, periodStart, today } from '@/lib/q/time'
 import { BUCKET, saveMedia, type MediaHit } from '@/lib/q/media'
 import type { Database } from '@/lib/types'
 import { DOMAINS, LOG_KINDS, type Cadence, type Domain, type LiftSet, type LogKind } from '@/lib/q/types'
@@ -96,14 +96,23 @@ export async function setRoutineActive(id: string, active: boolean) {
   done()
 }
 
-/** Check / uncheck a routine for its current period. Returns the Q$ change. */
-export async function toggleRoutine(id: string, on: boolean): Promise<number> {
+// How far back you can tick things you forgot.
+const BACKFILL_DAYS = 7
+
+/**
+ * Check / uncheck a routine. `day` (default today, up to a week back) picks
+ * the period — so a daily from Tuesday can be ticked on Thursday for full
+ * value. Returns the Q$ change.
+ */
+export async function toggleRoutine(id: string, on: boolean, day?: string): Promise<number> {
   const db = await qAction()
   const { data: r, error } = await db.from('q_routines').select('*').eq('id', id).single()
   if (error) throw error
   const t = today()
-  const p = r.cadence === 'interval' ? t : periodStart(r.cadence, t)
-  const entry = { source: 'routine' as const, domain: r.domain, note: r.title, occurred_on: t }
+  const d = day && day <= t && day >= addDays(t, -BACKFILL_DAYS) ? day : t
+  const p = r.cadence === 'interval' ? d : periodStart(r.cadence, d)
+  const closed = r.cadence === 'interval' ? d < t : periodEnd(r.cadence, p) < t
+  const entry = { source: 'routine' as const, domain: r.domain, note: r.title, occurred_on: d }
 
   const { data: existing } = await db
     .from('q_routine_checks')
@@ -112,10 +121,11 @@ export async function toggleRoutine(id: string, on: boolean): Promise<number> {
     .eq('period_start', p)
     .maybeSingle()
 
+  let delta = 0
   if (on) {
+    if (existing?.status === 'done' || existing?.status === 'late') return 0
     let checkId = existing?.id
     if (existing) {
-      if (existing.status === 'done') return 0
       await db.from('q_routine_checks').update({ status: 'done', done_at: new Date().toISOString() }).eq('id', existing.id)
     } else {
       const { data: c, error: e } = await db
@@ -126,16 +136,25 @@ export async function toggleRoutine(id: string, on: boolean): Promise<number> {
       if (e) throw e
       checkId = c.id
     }
-    await settle(db, { ...entry, source_id: checkId! }, r.value)
-    done()
-    return r.value
+    delta = await settle(db, { ...entry, source_id: checkId! }, r.value)
+  } else {
+    if (!existing || existing.status === 'missed') return 0
+    if (closed) {
+      // the period is over, so unticking it means it was missed
+      await db.from('q_routine_checks').update({ status: 'missed', done_at: null }).eq('id', existing.id)
+      delta = await settle(db, { ...entry, source_id: existing.id, note: `missed · ${r.title}` }, -missPenalty(r))
+    } else {
+      delta = await settle(db, { ...entry, source_id: existing.id }, 0)
+      await db.from('q_routine_checks').delete().eq('id', existing.id)
+    }
   }
-
-  if (!existing || existing.status !== 'done') return 0
-  await settle(db, { ...entry, source_id: existing.id }, 0)
-  await db.from('q_routine_checks').delete().eq('id', existing.id)
   done()
-  return -r.value
+  return delta
+}
+
+/** Same as toggleRoutine with the day bound first (for past-day rows). */
+export async function toggleRoutineOn(id: string, day: string, on: boolean): Promise<number> {
+  return toggleRoutine(id, on, day)
 }
 
 /** Do a missed routine after the fact: penalty is replaced by half value. */

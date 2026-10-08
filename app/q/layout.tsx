@@ -6,6 +6,7 @@ import { closeOut } from '@/lib/q/closeout'
 import { getBalances } from '@/lib/q/ledger'
 import { formatQ } from '@/lib/q/points'
 import TabBar from './_components/TabBar'
+import Back from './_components/Back'
 import Toaster from './_components/Toast'
 
 const mono = Space_Mono({ weight: ['400', '700'], subsets: ['latin'], variable: '--font-q-mono' })
@@ -30,7 +31,7 @@ export default async function QLayout({ children }: { children: React.ReactNode 
   return (
     <div className={`q-app ${mono.variable} ${display.variable}`}>
       <header className="q-header">
-        <span className="q-logo">q<span className="q-blink">_</span></span>
+        <Back />
         <div className="q-wallet">
           <div className="q-balance">Q$ {formatQ(balance)}</div>
           <div className="q-pending">

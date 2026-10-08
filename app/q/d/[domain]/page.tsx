@@ -9,6 +9,7 @@ import AddFab from '../../_components/AddFab'
 import MissionCard from '../../missions/MissionCard'
 import DomainLists from './DomainLists'
 import PeoplePanel from './PeoplePanel'
+import DomainSwipe from './DomainSwipe'
 
 export default async function DomainPage({ params }: { params: Promise<{ domain: string }> }) {
   const { domain } = await params
@@ -40,6 +41,7 @@ export default async function DomainPage({ params }: { params: Promise<{ domain:
 
   return (
     <main className="q-main" data-d={d}>
+      <DomainSwipe current={d} />
       <div>
         <div className="q-tiny q-dim">0{DOMAIN_INFO[d].n} · {DOMAIN_INFO[d].blurb}</div>
         <h1 className="q-h1" style={{ color: 'var(--d)', textShadow: '0 0 14px var(--d)' }}>{d}</h1>

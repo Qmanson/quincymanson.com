@@ -17,7 +17,7 @@ import {
 } from '@/lib/q/time'
 import { lateValue } from '@/lib/q/points'
 import type { QRoutine } from '@/lib/q/types'
-import { doLate, toggleRoutine, toggleTask } from './actions'
+import { doLate, toggleRoutine, toggleRoutineOn, toggleTask } from './actions'
 import CheckRow from './_components/CheckRow'
 import QuickLog from './_components/QuickLog'
 import AddFab from './_components/AddFab'
@@ -27,11 +27,16 @@ import MissionStrip from './missions/MissionStrip'
 const INTERVAL_HEADS_UP = 3
 const CADENCE_LABEL = { weekly: 'this week', monthly: 'this month', quarterly: 'this quarter', yearly: 'this year' } as const
 
-export default async function Today() {
+const BACKFILL_DAYS = 7
+
+export default async function Today({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
   const db = await qPage()
   const t = today()
+  const { day } = await searchParams
+  const first = addDays(t, -BACKFILL_DAYS)
+  const sel = day && /^\d{4}-\d{2}-\d{2}$/.test(day) && day >= first && day < t ? day : t
 
-  const [routinesRes, checksRes, missedRes, tasksRes, logTypesRes, intervalRes, missionsRes] = await Promise.all([
+  const [routinesRes, checksRes, missedRes, tasksRes, logTypesRes, intervalRes, missionsRes, weekRes] = await Promise.all([
     db.from('q_routines').select('*').eq('active', true).order('sort_order').order('created_at'),
     db
       .from('q_routine_checks')
@@ -56,6 +61,7 @@ export default async function Today() {
       .order('period_start', { ascending: false })
       .limit(500),
     db.from('q_missions').select('*').eq('status', 'active').order('created_at'),
+    db.from('q_routine_checks').select('routine_id, period_start, status').gte('period_start', first).lte('period_start', t),
   ])
 
   const routines = routinesRes.data ?? []
@@ -68,6 +74,68 @@ export default async function Today() {
 
   const daily = routines.filter(r => r.cadence === 'daily')
   const dailyDone = daily.filter(isDone).length
+
+  // The last week of dailies, for the day strip and past-day view.
+  const dayStatus = new Map<string, string>()
+  for (const c of weekRes.data ?? []) dayStatus.set(`${c.routine_id}|${c.period_start}`, c.status)
+  const strip = Array.from({ length: BACKFILL_DAYS + 1 }, (_, i) => {
+    const d = addDays(first, i)
+    const due = daily.filter(r => r.starts_on <= d)
+    const n = due.filter(r => ['done', 'late'].includes(dayStatus.get(`${r.id}|${d}`) ?? '')).length
+    return { d, n, total: due.length }
+  })
+  const dayStrip = (
+    <nav className="q-day-strip">
+      {strip.map(({ d, n, total }) => (
+        <Link
+          key={d}
+          href={d === t ? '/q' : `/q?day=${d}`}
+          replace
+          className={`q-day ${d === sel ? 'is-on' : ''}`}
+          style={{ ['--fill' as string]: total ? n / total : 0 }}
+        >
+          <span className="q-tiny">{d === t ? 'today' : formatDow(d).slice(0, 2)}</span>
+          <span className="q-day-num">{Number(d.slice(8))}</span>
+          <i />
+        </Link>
+      ))}
+    </nav>
+  )
+
+  if (sel !== t) {
+    const due = daily.filter(r => r.starts_on <= sel)
+    return (
+      <main className="q-main">
+        <div>
+          <div className="q-tiny q-dim">{formatDow(sel)} · {formatShort(sel)}</div>
+          <h1 className="q-h1">{relativeDay(sel, t)}</h1>
+        </div>
+        {dayStrip}
+        <section className="q-panel">
+          <div className="q-panel-title">
+            <span>▸ <b>daily</b> · forgot to tick it?</span>
+            <span>{strip.find(x => x.d === sel)?.n ?? 0}/{due.length}</span>
+          </div>
+          {due.length ? due.map(r => {
+            const st = dayStatus.get(`${r.id}|${sel}`)
+            return (
+              <CheckRow
+                key={`${r.id}-${sel}`}
+                title={r.title}
+                sub={<span className="q-tag" data-d={r.domain}>{r.domain}</span>}
+                value={r.value}
+                domain={r.domain}
+                done={st === 'done' || st === 'late'}
+                missed={st === 'missed'}
+                onToggle={toggleRoutineOn.bind(null, r.id, sel)}
+              />
+            )
+          }) : <p className="q-empty">no dailies yet on this day</p>}
+        </section>
+        <p className="q-small q-faint" style={{ textAlign: 'center' }}>ticking a past day pays full value and cancels its miss</p>
+      </main>
+    )
+  }
 
   // Non-daily routines for their current period.
   const cycle = routines
@@ -94,9 +162,10 @@ export default async function Today() {
     (a, b) => Number(isDone(a.r)) - Number(isDone(b.r)) || a.end.localeCompare(b.end),
   )
 
+  // dailies are fixed from the day strip; this is for weekly+ routines
   const missed = (missedRes.data ?? []).flatMap(c => {
     const r = byId.get(c.routine_id)
-    return r ? [{ c, r }] : []
+    return r && r.cadence !== 'daily' ? [{ c, r }] : []
   })
 
   const horizon = addDays(t, 7)
@@ -110,6 +179,8 @@ export default async function Today() {
         <div className="q-tiny q-dim">{formatDow(t)} · {formatShort(t)}</div>
         <h1 className="q-h1">today</h1>
       </div>
+
+      {dayStrip}
 
       {isSunday(t) && (
         <Link href="/q/review/weekly" className="q-panel q-panel-body" style={{ display: 'flex', justifyContent: 'space-between', borderColor: 'var(--phosphor)' }}>

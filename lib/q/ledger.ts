@@ -18,10 +18,10 @@ type Entry = {
  * Make the total Q$ recorded for (source, source_id) equal `desired`.
  *
  * Paid rows are history and never touched — pending rows are replaced
- * by a single row covering the difference. So toggling something done →
+ * by a single row covering the difference. Returns the net Q$ change. So toggling something done →
  * undone → done again never double counts, even across a payday.
  */
-export async function settle(db: DB, entry: Entry, desired: number) {
+export async function settle(db: DB, entry: Entry, desired: number): Promise<number> {
   const { data: rows, error } = await db
     .from('q_ledger')
     .select('id, amount, status')
@@ -33,13 +33,15 @@ export async function settle(db: DB, entry: Entry, desired: number) {
   const paid = rows.filter(r => r.status === 'paid').reduce((s, r) => s + r.amount, 0)
   const pending = rows.filter(r => r.status === 'pending')
   const want = desired - paid
+  const delta = desired - paid - pending.reduce((s, r) => s + r.amount, 0)
 
-  if (pending.length === 1 && pending[0].amount === want) return
+  if (pending.length === 1 && pending[0].amount === want) return 0
   if (pending.length) {
     const { error } = await db.from('q_ledger').delete().in('id', pending.map(r => r.id))
     if (error) throw error
   }
   if (want !== 0) await add(db, entry, want)
+  return delta
 }
 
 /** Append a pending row. */

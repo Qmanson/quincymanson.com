@@ -459,3 +459,57 @@ html[data-q-sheet] .q-fab { display: none; }
 }
 .q-hero-img { width: 100%; aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: rgba(122,162,255,.08); display: grid; place-items: center; }
 .q-hero-img img { width: 100%; height: 100%; object-fit: cover; }
+
+/* rows are often <button>s — beat the button reset so padding sticks */
+.q-app .q-row { padding: 8px 12px; width: 100%; }
+
+.q-skel {
+  display: block; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(122,162,255,.08), rgba(122,162,255,.18), rgba(122,162,255,.08));
+  background-size: 200% 100%;
+  animation: q-shimmer 1.1s linear infinite;
+}
+@keyframes q-shimmer { to { background-position: -200% 0; } }
+
+/* instant press feedback */
+.q-app .q-row:active, .q-app .q-tile:active, .q-app .q-product:active { background: rgba(122, 162, 255, 0.08); }
+.q-tab:active { transform: scale(0.94); }
+
+/* the top of a sheet is a drag handle: pull down to dismiss */
+.q-sheet-handle {
+  touch-action: none; cursor: grab;
+  margin: -10px -16px 0; padding: 10px 16px 2px;
+  position: sticky; top: -10px; z-index: 1;
+  background: var(--panel-solid);
+}
+
+.q-back { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding-right: 12px; }
+.q-back-arrow { font-family: var(--font-q-display), monospace; font-size: 40px; line-height: 1; color: var(--phosphor); margin-top: -4px; }
+
+.q-domain-strip {
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  margin: -6px -16px 0; padding: 0 16px;
+}
+.q-domain-strip::-webkit-scrollbar { display: none; }
+.q-domain-strip a {
+  flex: none; padding: 6px 12px; border-radius: 999px;
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--faint); border: 1px solid transparent;
+}
+.q-domain-strip a.is-on { color: var(--d); border-color: var(--d); box-shadow: 0 0 10px color-mix(in srgb, var(--d) 35%, transparent); }
+
+/* last week of days — tap one to tick what you forgot */
+.q-day-strip { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.q-day {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 0 8px; border-radius: var(--radius);
+  border: 1px solid var(--line); color: var(--dim);
+  position: relative; overflow: hidden;
+}
+.q-day .q-tiny { font-size: 9px; }
+.q-day-num { font-family: var(--font-q-display), monospace; font-size: 22px; line-height: 1; color: var(--ink); }
+.q-day i {
+  position: absolute; left: 0; bottom: 0; height: 3px;
+  width: calc(var(--fill) * 100%); background: var(--phosphor); box-shadow: 0 0 6px var(--phosphor);
+}
+.q-day.is-on { border-color: var(--phosphor); background: var(--phosphor-dim); color: var(--phosphor); }

@@ -4,8 +4,10 @@ import { useState, useTransition } from 'react'
 import { toast } from './Toast'
 
 /**
- * Form that runs a server action, shows errors inline and calls onDone
- * on success. Action may return a Q$ delta to flash.
+ * Form that runs a server action. When there's an onDone (i.e. it lives in
+ * a sheet) it closes immediately and the save finishes in the background —
+ * the result or any error shows as a toast. Without onDone it waits and
+ * shows errors inline.
  */
 export default function QForm({
   action,
@@ -28,11 +30,18 @@ export default function QForm({
         e.preventDefault()
         const f = new FormData(e.currentTarget)
         setError(null)
+        if (onDone) {
+          onDone()
+          toast('saving…')
+          action(f)
+            .then(r => toast(typeof r === 'number' && r !== 0 ? r : 'saved ✓'))
+            .catch(err => toast(`✕ ${err instanceof Error ? err.message : 'didn’t save'}`))
+          return
+        }
         start(async () => {
           try {
             const r = await action(f)
             if (typeof r === 'number') toast(r)
-            onDone?.()
           } catch (err) {
             setError(err instanceof Error ? err.message : 'something broke')
           }

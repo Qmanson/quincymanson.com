@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { qPage } from '@/lib/q/db'
 import { getBalances } from '@/lib/q/ledger'
@@ -22,7 +21,6 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   return (
     <main className="q-main" data-d={r.domain ?? undefined}>
-      <Link href="/q/shop" className="q-tiny q-dim">← shop</Link>
 
       <div className="q-hero-img">
         {img ? (

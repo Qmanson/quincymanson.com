@@ -23,8 +23,9 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // Refresh session
-  await supabase.auth.getUser()
+  // Refresh the session cookie if needed. getClaims verifies the JWT locally
+  // (with signing keys) instead of calling the auth server on every request.
+  await supabase.auth.getClaims()
 
   return supabaseResponse
 }

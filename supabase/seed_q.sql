@@ -45,13 +45,14 @@ insert into q_log_types (domain, name, kind, unit, value, sort_order) values
   ('body', 'bike',        'basic',     'mi',  20, 3),
   ('body', 'meditate',    'basic',     'min', 15, 4),
   ('body', 'substances',  'substance', null,  0,  5),
+  ('body', 'food',        'basic',     null,  0,  6),
   ('arts', 'movie',       'movie',     null,  15, 6),
   ('arts', 'book',        'book',      null,  100, 7),
   ('arts', 'album',       'album',     null,  10, 8),
   ('city', 'event',       'event',     null,  30, 9),
   ('styl', 'fit pic',     'photo',     null,  15, 10),
   ('crew', 'letter sent', 'basic',     null,  40, 11),
-  ('crew', 'kind act',    'basic',     null,  25, 12),
+  ('crew', 'gift',        'basic',     null,  25, 12),
   ('home', 'laundry load','basic',     null,  0,  13);
 
 -- ── shop: purchase wants ────────────────────────────────────

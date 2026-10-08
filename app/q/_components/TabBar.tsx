@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 
 const TABS = [
   { href: '/q', icon: '◉', label: 'today', match: (p: string) => p === '/q' },
@@ -13,14 +14,26 @@ const TABS = [
 
 export default function TabBar() {
   const pathname = usePathname()
+  // Light the tapped tab immediately instead of waiting for the route.
+  const [tapped, setTapped] = useState<{ href: string; from: string } | null>(null)
+  const pending = tapped && tapped.from === pathname ? tapped.href : null
+
   return (
     <nav className="q-tabbar">
-      {TABS.map(t => (
-        <Link key={t.href} href={t.href} className={`q-tab ${t.match(pathname) ? 'is-on' : ''}`}>
-          <span className="q-tab-icon">{t.icon}</span>
-          {t.label}
-        </Link>
-      ))}
+      {TABS.map(t => {
+        const on = pending ? pending === t.href : t.match(pathname)
+        return (
+          <Link
+            key={t.href}
+            href={t.href}
+            className={`q-tab ${on ? 'is-on' : ''}`}
+            onClick={() => setTapped({ href: t.href, from: pathname })}
+          >
+            <span className="q-tab-icon">{t.icon}</span>
+            {t.label}
+          </Link>
+        )
+      })}
     </nav>
   )
 }
