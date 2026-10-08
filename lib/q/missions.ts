@@ -191,3 +191,92 @@ async function addStreakStrikes(db: DB, m: QMission, t: string) {
     if (error && error.code !== '23505') throw error // 23505 = already struck
   }
 }
+
+// ── view model ──────────────────────────────────────────────
+
+export type MissionView = {
+  /** 0–1 */
+  pct: number
+  label: string
+  strikes: number
+  /** What finishing right now would pay (after strikes + theme). */
+  payoutNow: number
+  checkedToday: boolean
+  daysLeft: number | null
+  steps: { id: string; title: string; done: boolean }[]
+}
+
+export async function loadMissionViews(db: DB, missions: QMission[]): Promise<Map<string, MissionView>> {
+  const out = new Map<string, MissionView>()
+  if (!missions.length) return out
+  const ids = missions.map(m => m.id)
+  const t = today()
+
+  const [{ data: checks }, { data: strikes }, { data: steps }] = await Promise.all([
+    db.from('q_mission_checks').select('mission_id, checked_on, amount').in('mission_id', ids),
+    db.from('q_strikes').select('mission_id').in('mission_id', ids),
+    db.from('q_mission_steps').select('*').in('mission_id', ids).order('sort_order'),
+  ])
+
+  for (const m of missions) {
+    const mc = (checks ?? []).filter(c => c.mission_id === m.id)
+    const ms = (strikes ?? []).filter(s => s.mission_id === m.id).length
+    const st = (steps ?? []).filter(s => s.mission_id === m.id)
+    const s = startDate(m)
+    const end = endDate(m)
+    const daysLeft = end ? daysBetween(t, end) : null
+
+    let pct = 0
+    let label = ''
+    let base: number = m.reward
+
+    switch (m.kind) {
+      case 'streak': {
+        const ps = streakPeriods(m)
+        const hit = ps.filter(([a, b]) => mc.filter(c => c.checked_on >= a && c.checked_on <= b).length >= m.streak_per_period).length
+        pct = ps.length ? hit / ps.length : 0
+        label = `${hit}/${ps.length} ${m.streak_cadence === 'weekly' ? 'weeks' : 'days'}`
+        break
+      }
+      case 'abstain': {
+        const elapsed = s ? Math.min(daysBetween(s, t) + 1, m.duration_days ?? 0) : 0
+        pct = m.duration_days ? elapsed / m.duration_days : 0
+        label = `day ${elapsed}/${m.duration_days ?? '?'}`
+        break
+      }
+      case 'target': {
+        const prog = await targetProgress(db, m)
+        const target = Number(m.target_amount ?? 0)
+        pct = target ? Math.min(1, prog / target) : 0
+        base = Math.round(m.reward * pct)
+        label = `${+prog.toFixed(2)}/${target}`
+        break
+      }
+      case 'checklist':
+      case 'deadline': {
+        const n = st.filter(x => x.done_at).length
+        pct = st.length ? n / st.length : 0
+        label = st.length ? `${n}/${st.length} steps` : m.kind === 'deadline' && m.due_on ? `due ${m.due_on}` : 'open'
+        break
+      }
+      case 'speed': {
+        const n = st.filter(x => x.done_at).length
+        pct = st.length ? n / st.length : 0
+        base = baseReward(m, t) ?? 0
+        label = s ? `day ${daysBetween(s, t) + 1}` : ''
+        break
+      }
+    }
+
+    out.set(m.id, {
+      pct,
+      label,
+      strikes: ms,
+      payoutNow: m.status === 'active' ? withTheme(m, applyStrikes(m, base, ms)) : m.payout ?? 0,
+      checkedToday: mc.some(c => c.checked_on === t),
+      daysLeft,
+      steps: st.map(x => ({ id: x.id, title: x.title, done: !!x.done_at })),
+    })
+  }
+  return out
+}
