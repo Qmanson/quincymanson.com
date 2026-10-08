@@ -37,7 +37,6 @@ export const HOME = {
   navItems: [
     { href: "/blog", icon: "✎", label: "BLOG", desc: "tbd" },
     { href: "/art", icon: "✦", label: "ART", desc: "tbd" },
-    { href: "/trackers", icon: "▦", label: "TRACKERS", desc: "habit heatmaps" },
     {
       href: "/links",
       icon: "⚓",
@@ -59,7 +58,6 @@ export const HOME = {
 export const NAV = {
   blog: "BLOG",
   art: "ART",
-  trackers: "TRACKERS",
   links: "LINKS",
   login: "[LOGIN]",
   logout: "[LOGOUT]",
@@ -182,37 +180,6 @@ export const ART = {
   cancelLabel: "CANCEL",
 } as const;
 
-// ── Trackers ──────────────────────────────────────────────────────
-
-export const TRACKERS = {
-  windowTitle: "▦ trackers.htm",
-  pageHeading: "▦ The Trackers",
-  empty: "no trackers yet",
-  hint: "▸ click any cell to log/edit a day (with optional notes)",
-  daysLoggedSuffix: "days logged",
-  newTrackerButton: "[+ NEW TRACKER]",
-  quickLogButton: "[+ QUICK LOG]",
-  // Quick log form
-  trackerSelectPlaceholder: "— tracker —",
-  notePlaceholder: "note (optional)",
-  logLabel: "LOG",
-  // New tracker dialog
-  newTrackerDialogTitle: "new_tracker.dlg",
-  fieldName: "NAME:",
-  fieldIcon: "ICON:",
-  colorLabel: "COLOR:",
-  namePlaceholder: "workout",
-  iconPlaceholder: "🏋️ (emoji, optional)",
-  okLabel: "OK",
-  cancelLabel: "CANCEL",
-  // Popover
-  popoverUpdate: "UPDATE",
-  popoverLog: "LOG",
-  popoverRemove: "REMOVE",
-  // Hover tooltip
-  tooltipLogged: "✓ logged",
-} as const;
-
 // ── Links ─────────────────────────────────────────────────────────
 
 export const LINKS = {
@@ -252,6 +219,5 @@ export const ADMIN_BAR = {
     { href: "/art", label: "+ ARTWORK" },
     { href: "/art", label: "+ MEDIUM" },
   ],
-  trackerActions: [{ href: "/trackers", label: "+ TRACKER" }],
   linkActions: [{ href: "/links", label: "+ LINK" }],
 } as const;

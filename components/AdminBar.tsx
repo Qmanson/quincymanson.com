@@ -46,7 +46,6 @@ export default function AdminBar() {
 function getContextLinks(pathname: string): readonly { href: string; label: string }[] {
   if (pathname.startsWith('/blog')) return ADMIN_BAR.blogActions
   if (pathname.startsWith('/art')) return ADMIN_BAR.artActions
-  if (pathname.startsWith('/trackers')) return ADMIN_BAR.trackerActions
   if (pathname.startsWith('/links')) return ADMIN_BAR.linkActions
   return []
 }

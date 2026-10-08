@@ -3,9 +3,16 @@ import { getUser } from '@/lib/auth'
 import LoginForm from './LoginForm'
 import { LOGIN } from '@/lib/content'
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>
+}) {
+  const { next } = await searchParams
+  // only allow internal paths
+  const dest = next && /^\/(?![/\\])/.test(next) ? next : '/'
   const user = await getUser()
-  if (user) redirect('/')
+  if (user) redirect(dest)
 
   return (
     <div className="window max-w-sm mx-auto mt-12">
@@ -17,7 +24,7 @@ export default async function LoginPage() {
         <p className="label" style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 12 }}>
           {LOGIN.ribbon}
         </p>
-        <LoginForm />
+        <LoginForm next={dest} />
       </div>
     </div>
   )

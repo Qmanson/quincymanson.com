@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { LOGIN } from '@/lib/content'
 
-export default function LoginForm() {
+export default function LoginForm({ next = '/' }: { next?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -21,7 +21,7 @@ export default function LoginForm() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) { setError(error.message); setLoading(false) }
-    else { router.push('/'); router.refresh() }
+    else { router.push(next); router.refresh() }
   }
 
   return (

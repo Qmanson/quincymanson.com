@@ -1,3 +1,5 @@
+import type { Domain, QTables } from '@/lib/q/types'
+
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
 export type ArtworkFile = {
@@ -5,11 +7,6 @@ export type ArtworkFile = {
   type: 'image' | 'video' | 'audio' | 'embed'
   caption?: string
 }
-
-export type TrackerValue =
-  | { bool: boolean }
-  | { num: number }
-  | { text: string }
 
 export interface Database {
   public: {
@@ -70,6 +67,8 @@ export interface Database {
           tags: string[]
           published: boolean
           published_at: string | null
+          kind: 'post' | 'journal' | 'note'
+          domain: Domain | null
           created_at: string
           updated_at: string
         }
@@ -83,6 +82,8 @@ export interface Database {
           tags?: string[]
           published?: boolean
           published_at?: string | null
+          kind?: 'post' | 'journal' | 'note'
+          domain?: Domain | null
           created_at?: string
           updated_at?: string
         }
@@ -96,6 +97,8 @@ export interface Database {
           tags?: string[]
           published?: boolean
           published_at?: string | null
+          kind?: 'post' | 'journal' | 'note'
+          domain?: Domain | null
           created_at?: string
           updated_at?: string
         }
@@ -180,74 +183,6 @@ export interface Database {
           }
         ]
       }
-      trackers: {
-        Row: {
-          id: string
-          name: string
-          slug: string
-          color: string
-          icon: string | null
-          value_type: string
-          sort_order: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          slug: string
-          color?: string
-          icon?: string | null
-          value_type?: string
-          sort_order?: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          slug?: string
-          color?: string
-          icon?: string | null
-          value_type?: string
-          sort_order?: number
-          created_at?: string
-        }
-        Relationships: []
-      }
-      tracker_entries: {
-        Row: {
-          id: string
-          tracker_id: string
-          date: string
-          value: Json
-          note: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          tracker_id: string
-          date: string
-          value: Json
-          note?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          tracker_id?: string
-          date?: string
-          value?: Json
-          note?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'tracker_entries_tracker_id_fkey'
-            columns: ['tracker_id']
-            isOneToOne: false
-            referencedRelation: 'trackers'
-            referencedColumns: ['id']
-          }
-        ]
-      }
       links: {
         Row: {
           id: string
@@ -278,12 +213,20 @@ export interface Database {
         }
         Relationships: []
       }
-    }
+    } & QTables
     Views: Record<string, never>
     Functions: {
       increment_artwork_likes: {
         Args: { artwork_id: string; delta: number }
         Returns: number
+      }
+      is_admin: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
+      q_balances: {
+        Args: Record<string, never>
+        Returns: { balance: number; pending: number }[]
       }
     }
     Enums: Record<string, never>
@@ -299,6 +242,4 @@ export type Medium = Database['public']['Tables']['mediums']['Row']
 // files is Json in DB, cast to ArtworkFile[] at runtime
 export type ArtworkRow = Database['public']['Tables']['artworks']['Row']
 export type Artwork = Omit<ArtworkRow, 'files'> & { files: ArtworkFile[] }
-export type Tracker = Database['public']['Tables']['trackers']['Row']
-export type TrackerEntry = Database['public']['Tables']['tracker_entries']['Row']
 export type Link = Database['public']['Tables']['links']['Row']
