@@ -513,3 +513,38 @@ html[data-q-sheet] .q-fab { display: none; }
   width: calc(var(--fill) * 100%); background: var(--phosphor); box-shadow: 0 0 6px var(--phosphor);
 }
 .q-day.is-on { border-color: var(--phosphor); background: var(--phosphor-dim); color: var(--phosphor); }
+
+/* check rows: the tap target is the whole row except the ⋯ */
+.q-app .q-row.q-check { padding: 0; gap: 0; }
+.q-app .q-check-hit {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 52px; padding: 8px 12px; text-align: left;
+}
+.q-check .q-row-title { display: block; white-space: normal; overflow-wrap: anywhere; }
+.q-app .q-more {
+  flex: none; align-self: stretch;
+  padding: 0 14px !important; min-width: 44px;
+  color: var(--faint); font-size: 18px !important;
+  border-left: 1px solid rgba(122, 162, 255, 0.07);
+}
+
+.q-photo-frame {
+  width: 100%; max-height: 52dvh; overflow: hidden; position: relative;
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  touch-action: none; cursor: grab; background: #000;
+}
+.q-photo-frame img { display: block; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+.q-cropped { overflow: hidden; }
+
+.q-thumb { display: block; }
+
+/* urgency */
+.q-urg { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; padding: 0 6px; border-radius: 3px; border: 1px solid currentColor; }
+.q-urg.is-asap { color: var(--danger); }
+.q-urg.is-soon { color: var(--warn); }
+.q-urg.is-whenever { color: var(--faint); }
+.q-urg-head { padding: 10px 12px 2px; }
+.q-urg-head.is-asap { color: var(--danger); }
+.q-urg-head.is-soon { color: var(--warn); }
+.q-urg-head.is-whenever { color: var(--faint); }

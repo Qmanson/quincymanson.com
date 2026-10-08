@@ -1,5 +1,6 @@
 'use server'
 
+import { act } from '@/lib/q/act'
 import { revalidatePath } from 'next/cache'
 import { qAction } from '@/lib/q/db'
 import { settle } from '@/lib/q/ledger'
@@ -7,7 +8,7 @@ import { lateValue, missPenalty, TASK_SIZES } from '@/lib/q/points'
 import { addDays, periodEnd, periodStart, today } from '@/lib/q/time'
 import { BUCKET, saveMedia, type MediaHit } from '@/lib/q/media'
 import type { Database } from '@/lib/types'
-import { DOMAINS, LOG_KINDS, type Cadence, type Domain, type LiftSet, type LogKind } from '@/lib/q/types'
+import { DOMAINS, LOG_KINDS, URGENCIES, type Urgency, type Cadence, type Domain, type Crop, type LiftSet, type LogKind } from '@/lib/q/types'
 
 function done() {
   revalidatePath('/q', 'layout')
@@ -50,7 +51,7 @@ function required(f: FormData, k: string): string {
 
 const CADENCES: Cadence[] = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'interval']
 
-export async function createRoutine(f: FormData) {
+export const createRoutine = act(async function createRoutine(f: FormData) {
   const db = await qAction()
   const cadence = str(f, 'cadence') as Cadence
   if (!CADENCES.includes(cadence)) throw new Error('Pick a cadence')
@@ -66,9 +67,9 @@ export async function createRoutine(f: FormData) {
   })
   if (error) throw error
   done()
-}
+})
 
-export async function updateRoutine(id: string, f: FormData) {
+export const updateRoutine = act(async function updateRoutine(id: string, f: FormData) {
   const db = await qAction()
   const cadence = str(f, 'cadence') as Cadence
   if (!CADENCES.includes(cadence)) throw new Error('Pick a cadence')
@@ -83,9 +84,9 @@ export async function updateRoutine(id: string, f: FormData) {
   }).eq('id', id)
   if (error) throw error
   done()
-}
+})
 
-export async function setRoutineActive(id: string, active: boolean) {
+export const setRoutineActive = act(async function setRoutineActive(id: string, active: boolean) {
   const db = await qAction()
   // Re-activating starts fresh today so the paused stretch isn't penalised.
   const { error } = await db
@@ -94,7 +95,7 @@ export async function setRoutineActive(id: string, active: boolean) {
     .eq('id', id)
   if (error) throw error
   done()
-}
+})
 
 // How far back you can tick things you forgot.
 const BACKFILL_DAYS = 7
@@ -104,7 +105,7 @@ const BACKFILL_DAYS = 7
  * the period — so a daily from Tuesday can be ticked on Thursday for full
  * value. Returns the Q$ change.
  */
-export async function toggleRoutine(id: string, on: boolean, day?: string): Promise<number> {
+export const toggleRoutine = act(async function toggleRoutine(id: string, on: boolean, day?: string): Promise<number> {
   const db = await qAction()
   const { data: r, error } = await db.from('q_routines').select('*').eq('id', id).single()
   if (error) throw error
@@ -150,15 +151,15 @@ export async function toggleRoutine(id: string, on: boolean, day?: string): Prom
   }
   done()
   return delta
-}
+})
 
 /** Same as toggleRoutine with the day bound first (for past-day rows). */
-export async function toggleRoutineOn(id: string, day: string, on: boolean): Promise<number> {
+export const toggleRoutineOn = act(async function toggleRoutineOn(id: string, day: string, on: boolean) {
   return toggleRoutine(id, on, day)
-}
+})
 
 /** Do a missed routine after the fact: penalty is replaced by half value. */
-export async function doLate(checkId: string): Promise<number> {
+export const doLate = act(async function doLate(checkId: string): Promise<number> {
   const db = await qAction()
   const { data: c, error } = await db
     .from('q_routine_checks')
@@ -174,11 +175,16 @@ export async function doLate(checkId: string): Promise<number> {
   await settle(db, { source: 'routine', source_id: c.id, domain: r.domain, note: `late · ${r.title}` }, late)
   done()
   return late + missPenalty(r)
-}
+})
 
 // ── tasks ───────────────────────────────────────────────────
 
-export async function createTask(f: FormData) {
+function urgency(f: FormData): Urgency {
+  const u = str(f, 'urgency')
+  return u && (URGENCIES as readonly string[]).includes(u) ? (u as Urgency) : 'whenever'
+}
+
+export const createTask = act(async function createTask(f: FormData) {
   const db = await qAction()
   const size = str(f, 'size') as keyof typeof TASK_SIZES | null
   const value = int(f, 'value') ?? (size && size in TASK_SIZES ? TASK_SIZES[size] : TASK_SIZES.S)
@@ -187,28 +193,30 @@ export async function createTask(f: FormData) {
     title: required(f, 'title'),
     notes: str(f, 'notes'),
     value,
+    urgency: urgency(f),
     due_date: str(f, 'due_date'),
     project_id: str(f, 'project_id'),
   })
   if (error) throw error
   done()
-}
+})
 
-export async function updateTask(id: string, f: FormData) {
+export const updateTask = act(async function updateTask(id: string, f: FormData) {
   const db = await qAction()
   const { error } = await db.from('q_tasks').update({
     domain: domain(f),
     title: required(f, 'title'),
     notes: str(f, 'notes'),
     value: int(f, 'value') ?? TASK_SIZES.S,
+    urgency: urgency(f),
     due_date: str(f, 'due_date'),
     project_id: str(f, 'project_id'),
   }).eq('id', id)
   if (error) throw error
   done()
-}
+})
 
-export async function toggleTask(id: string, on: boolean): Promise<number> {
+export const toggleTask = act(async function toggleTask(id: string, on: boolean): Promise<number> {
   const db = await qAction()
   const { data: t, error } = await db.from('q_tasks').select('*').eq('id', id).single()
   if (error) throw error
@@ -217,15 +225,15 @@ export async function toggleTask(id: string, on: boolean): Promise<number> {
   await settle(db, { source: 'task', source_id: id, domain: t.domain, note: t.title }, on ? t.value : 0)
   done()
   return on ? t.value : -t.value
-}
+})
 
-export async function deleteTask(id: string) {
+export const deleteTask = act(async function deleteTask(id: string) {
   const db = await qAction()
   const { data: t } = await db.from('q_tasks').select('domain, title').eq('id', id).single()
   if (t) await settle(db, { source: 'task', source_id: id, domain: t.domain }, 0)
   await db.from('q_tasks').delete().eq('id', id)
   done()
-}
+})
 
 // ── logs ────────────────────────────────────────────────────
 
@@ -234,7 +242,7 @@ function logKind(f: FormData): LogKind {
   return (LOG_KINDS as readonly string[]).includes(k) ? (k as LogKind) : 'basic'
 }
 
-export async function createLogType(f: FormData) {
+export const createLogType = act(async function createLogType(f: FormData) {
   const db = await qAction()
   const { error } = await db.from('q_log_types').insert({
     domain: domain(f),
@@ -245,9 +253,9 @@ export async function createLogType(f: FormData) {
   })
   if (error) throw error
   done()
-}
+})
 
-export async function updateLogType(id: string, f: FormData) {
+export const updateLogType = act(async function updateLogType(id: string, f: FormData) {
   const db = await qAction()
   const { error } = await db.from('q_log_types').update({
     domain: domain(f),
@@ -258,13 +266,13 @@ export async function updateLogType(id: string, f: FormData) {
   }).eq('id', id)
   if (error) throw error
   done()
-}
+})
 
-export async function setLogTypeActive(id: string, active: boolean) {
+export const setLogTypeActive = act(async function setLogTypeActive(id: string, active: boolean) {
   const db = await qAction()
   await db.from('q_log_types').update({ active }).eq('id', id)
   done()
-}
+})
 
 function json<T>(f: FormData, k: string): T | null {
   const v = str(f, k)
@@ -285,7 +293,7 @@ function tags(f: FormData): string[] {
   return [...new Set((str(f, 'tags') ?? '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]
 }
 
-export async function addLog(f: FormData): Promise<number> {
+export const addLog = act(async function addLog(f: FormData): Promise<number> {
   const db = await qAction()
   const typeId = required(f, 'log_type_id')
   const { data: lt, error } = await db.from('q_log_types').select('*').eq('id', typeId).single()
@@ -338,6 +346,7 @@ export async function addLog(f: FormData): Promise<number> {
       break
     case 'photo':
       row.photo_path = str(f, 'photo_path')
+      row.photo_crop = json<Crop>(f, 'photo_crop')
       if (!row.photo_path) throw new Error('add a photo')
       row.amount = null
       break
@@ -363,19 +372,19 @@ export async function addLog(f: FormData): Promise<number> {
   }
   done()
   return lt.value
-}
+})
 
-export async function deleteLog(id: string) {
+export const deleteLog = act(async function deleteLog(id: string) {
   const db = await qAction()
   const { data: log } = await db.from('q_logs').select('photo_path').eq('id', id).maybeSingle()
   if (log?.photo_path) await db.storage.from(BUCKET).remove([log.photo_path])
   await settle(db, { source: 'log', source_id: id }, 0)
   await db.from('q_logs').delete().eq('id', id)
   done()
-}
+})
 
 /** Suggestions for the log sheet: known workouts, people and tags. */
-export async function logFormData(logTypeId: string) {
+export const logFormData = act(async function logFormData(logTypeId: string) {
   const db = await qAction()
   const [{ data: workouts }, { data: people }, { data: recent }] = await Promise.all([
     db.from('q_workouts').select('name').order('name'),
@@ -389,4 +398,4 @@ export async function logFormData(logTypeId: string) {
     people: people ?? [],
     tags: [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([t]) => t),
   }
-}
+})

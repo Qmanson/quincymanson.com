@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { QReward } from '@/lib/q/types'
 import { formatQ } from '@/lib/q/points'
+import { toCrop } from '@/lib/q/crop'
 import QForm from '../_components/Form'
 import { DomainPicker, Seg } from '../_components/Pickers'
 import { PhotoInput } from '../_components/log/inputs'
@@ -28,6 +29,7 @@ export default function RewardForm({
 }) {
   const [usd, setUsd] = useState(r?.usd_price != null ? String(r.usd_price) : '')
   const [rate, setRate] = useState(String(initialRate))
+  const [link, setLink] = useState(r?.image_url ?? '')
   const usdN = Number(usd)
   const rateN = Number(rate)
   const hasUsd = usd !== '' && usdN > 0
@@ -36,10 +38,18 @@ export default function RewardForm({
 
   return (
     <QForm action={r ? updateReward.bind(null, r.id) : createReward} onDone={onDone}>
-      <PhotoInput name="image_path" folder="shop" initialUrl={imageSrc} />
+      <PhotoInput
+        name="image_path"
+        cropName="image_crop"
+        folder="shop"
+        aspect="1 / 1"
+        initialUrl={imageSrc}
+        initialCrop={r ? toCrop(r.image_crop) : null}
+        fallbackUrl={/^https?:\/\//.test(link) ? link : null}
+      />
       <label className="q-field">
         or paste an image link
-        <input name="image_url" type="url" defaultValue={r?.image_url ?? ''} placeholder="https://…jpg" />
+        <input name="image_url" type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="https://…jpg" />
       </label>
       <label className="q-field">
         what
@@ -64,7 +74,7 @@ export default function RewardForm({
         ) : (
           <label className="q-field">
             or set Q$ directly
-            <input name="cost" type="number" inputMode="numeric" defaultValue={r?.usd_price == null ? r?.cost : undefined} placeholder="5000" />
+            <input name="cost" type="number" inputMode="numeric" required defaultValue={r?.usd_price == null ? r?.cost : undefined} placeholder="5000" />
           </label>
         )}
         {rateChanged && (

@@ -1,34 +1,32 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { QLogType, QRoutine, QTask } from '@/lib/q/types'
+import type { QLogType, QRoutine } from '@/lib/q/types'
 import type { LogView } from '@/lib/q/logview'
 import { missPenalty, starText } from '@/lib/q/points'
+import { cropStyle } from '@/lib/q/crop'
 import { relativeDay } from '@/lib/q/time'
 import Sheet from '../../_components/Sheet'
-import CheckRow from '../../_components/CheckRow'
-import { LogForm, LogTypeForm, RoutineForm, TaskForm } from '../../_components/forms'
+import { LogForm, LogTypeForm, RoutineForm } from '../../_components/forms'
 import { toast } from '../../_components/Toast'
+import { unwrap } from '@/lib/q/act'
 import { Cover } from '../../_components/log/inputs'
-import { deleteLog, deleteTask, setLogTypeActive, setRoutineActive, toggleTask } from '../../actions'
+import { deleteLog, setLogTypeActive, setRoutineActive } from '../../actions'
 
 const CADENCE_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'interval'] as const
 
 type Edit =
   | { kind: 'routine'; item: QRoutine }
-  | { kind: 'task'; item: QTask }
   | { kind: 'logType'; item: QLogType }
   | { kind: 'log'; item: QLogType }
   | null
 
 export default function DomainLists({
   routines,
-  tasks,
   logTypes,
   logs,
 }: {
   routines: QRoutine[]
-  tasks: QTask[]
   logTypes: QLogType[]
   logs: LogView[]
 }) {
@@ -38,7 +36,7 @@ export default function DomainLists({
 
   function run(fn: () => Promise<unknown>) {
     start(async () => {
-      try { await fn(); close() } catch { toast('✕ failed') }
+      try { unwrap(await fn()); close() } catch (e) { toast(`✕ ${e instanceof Error ? e.message : 'failed'}`) }
     })
   }
 
@@ -83,31 +81,6 @@ export default function DomainLists({
         )}
       </section>
 
-      <section className="q-panel">
-        <div className="q-panel-title"><span>▸ <b>tasks</b></span><span>{tasks.filter(t => !t.done_at).length} open</span></div>
-        {tasks.length === 0 && <p className="q-empty">none yet</p>}
-        {tasks.map(task => (
-          <div key={task.id} style={{ display: 'flex', alignItems: 'stretch' }}>
-            <CheckRow
-              title={task.title}
-              sub={task.due_date ? <span>{relativeDay(task.due_date)}</span> : undefined}
-              value={task.value}
-              domain={task.domain}
-              done={!!task.done_at}
-              onToggle={toggleTask.bind(null, task.id)}
-            />
-            <button
-              type="button"
-              aria-label="edit"
-              className="q-faint"
-              style={{ padding: '0 14px', borderBottom: '1px solid rgba(122,162,255,0.07)' }}
-              onClick={() => setEdit({ kind: 'task', item: task })}
-            >
-              ⋯
-            </button>
-          </div>
-        ))}
-      </section>
 
       <section className="q-panel">
         <div className="q-panel-title"><span>▸ <b>logs</b></span></div>
@@ -127,7 +100,7 @@ export default function DomainLists({
             {l.mediaKind && <Cover url={l.cover} kind={l.mediaKind} size={40} />}
             {l.photo && (
               // eslint-disable-next-line @next/next/no-img-element
-              <a href={l.photo} target="_blank" rel="noreferrer"><img className="q-thumb" src={l.photo} alt="" /></a>
+              <a href={l.photo} target="_blank" rel="noreferrer" className="q-thumb q-cropped"><img src={l.photo} alt="" style={cropStyle(l.photoCrop)} /></a>
             )}
             <span className="q-row-main" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span className="q-row-title">
@@ -170,21 +143,6 @@ export default function DomainLists({
         )}
       </Sheet>
 
-      <Sheet open={edit?.kind === 'task'} onClose={close} title="edit task">
-        {edit?.kind === 'task' && (
-          <>
-            <TaskForm task={edit.item} onDone={close} />
-            <button
-              className="q-btn is-danger is-block"
-              style={{ marginTop: 10 }}
-              disabled={pending}
-              onClick={() => confirm('delete task?') && run(() => deleteTask(edit.item.id))}
-            >
-              delete
-            </button>
-          </>
-        )}
-      </Sheet>
 
       <Sheet open={edit?.kind === 'log'} onClose={close} title={edit?.kind === 'log' ? `log ${edit.item.name}` : ''}>
         {edit?.kind === 'log' && (

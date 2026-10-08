@@ -1,12 +1,13 @@
 'use server'
 
+import { act } from '@/lib/q/act'
 import { revalidatePath } from 'next/cache'
 import { qAction } from '@/lib/q/db'
 import { add, getBalances } from '@/lib/q/ledger'
 import { BUCKET } from '@/lib/q/media'
 import { getRate, setRate } from '@/lib/q/rate'
 import { addDays, dateOf, today } from '@/lib/q/time'
-import { DOMAINS, type Domain, type QReward } from '@/lib/q/types'
+import { DOMAINS, type Crop, type Domain, type QReward } from '@/lib/q/types'
 
 const CATEGORIES: QReward['category'][] = ['want', 'treat', 'experience', 'other']
 
@@ -30,6 +31,15 @@ async function priced(db: Awaited<ReturnType<typeof qAction>>, f: FormData) {
   return { usd_price, cost }
 }
 
+function cropOf(f: FormData, k: string): Crop | null {
+  try {
+    const c = JSON.parse(str(f, k) ?? 'null')
+    return c && typeof c.x === 'number' ? { x: c.x, y: c.y, z: c.z } : null
+  } catch {
+    return null
+  }
+}
+
 function fields(f: FormData, price: { usd_price: number | null; cost: number }) {
   const title = str(f, 'title')
   if (!title) throw new Error('title is required')
@@ -44,42 +54,43 @@ function fields(f: FormData, price: { usd_price: number | null; cost: number }) 
     cooldown_days: Number(str(f, 'cooldown_days')) || null,
     url: str(f, 'url'),
     image_url: str(f, 'image_url'),
+    image_crop: cropOf(f, 'image_crop'),
     notes: str(f, 'notes'),
     // only replace an uploaded picture when a new one was picked
     ...(str(f, 'image_path') ? { image_path: str(f, 'image_path') } : {}),
   }
 }
 
-export async function createReward(f: FormData) {
+export const createReward = act(async function createReward(f: FormData) {
   const db = await qAction()
   const { error } = await db.from('q_rewards').insert(fields(f, await priced(db, f)))
   if (error) throw error
   revalidatePath('/q', 'layout')
-}
+})
 
-export async function updateReward(id: string, f: FormData) {
+export const updateReward = act(async function updateReward(id: string, f: FormData) {
   const db = await qAction()
   const { error } = await db.from('q_rewards').update(fields(f, await priced(db, f))).eq('id', id)
   if (error) throw error
   revalidatePath('/q', 'layout')
-}
+})
 
-export async function removeRewardImage(id: string) {
+export const removeRewardImage = act(async function removeRewardImage(id: string) {
   const db = await qAction()
   const { data: r } = await db.from('q_rewards').select('image_path').eq('id', id).single()
   if (r?.image_path) await db.storage.from(BUCKET).remove([r.image_path])
   await db.from('q_rewards').update({ image_path: null, image_url: null }).eq('id', id)
   revalidatePath('/q', 'layout')
-}
+})
 
-export async function retireReward(id: string) {
+export const retireReward = act(async function retireReward(id: string) {
   const db = await qAction()
   await db.from('q_rewards').update({ status: 'retired' }).eq('id', id)
   revalidatePath('/q', 'layout')
-}
+})
 
 /** Spend Q$. Returns the (negative) change. */
-export async function buyReward(id: string): Promise<number> {
+export const buyReward = act(async function buyReward(id: string): Promise<number> {
   const db = await qAction()
   const { data: r, error } = await db.from('q_rewards').select('*').eq('id', id).single()
   if (error) throw error
@@ -108,4 +119,4 @@ export async function buyReward(id: string): Promise<number> {
   if (!r.repeatable) await db.from('q_rewards').update({ status: 'bought' }).eq('id', id)
   revalidatePath('/q', 'layout')
   return -r.cost
-}
+})

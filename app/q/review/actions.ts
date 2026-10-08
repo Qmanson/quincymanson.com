@@ -1,5 +1,6 @@
 'use server'
 
+import { act } from '@/lib/q/act'
 import { revalidatePath } from 'next/cache'
 import { qAction } from '@/lib/q/db'
 import { settle } from '@/lib/q/ledger'
@@ -15,7 +16,7 @@ function str(f: FormData, k: string): string | null {
 }
 
 /** Finish a review: save notes, add the bonus, and (weekly) run payday. Returns Q$ claimed. */
-export async function completeReview(cadence: ReviewCadence, f: FormData): Promise<number> {
+export const completeReview = act(async function completeReview(cadence: ReviewCadence, f: FormData): Promise<number> {
   if (!CADENCES.includes(cadence)) throw new Error('bad cadence')
   const db = await qAction()
 
@@ -50,10 +51,10 @@ export async function completeReview(cadence: ReviewCadence, f: FormData): Promi
 
   revalidatePath('/q', 'layout')
   return claimed || REVIEW_BONUS[cadence]
-}
+})
 
 /** Set the yearly theme or this quarter's sub-theme. */
-export async function setTheme(scope: 'year' | 'quarter', f: FormData) {
+export const setTheme = act(async function setTheme(scope: 'year' | 'quarter', f: FormData) {
   const db = await qAction()
   const title = str(f, 'title')
   if (!title) throw new Error('theme needs a title')
@@ -64,4 +65,4 @@ export async function setTheme(scope: 'year' | 'quarter', f: FormData) {
   )
   if (error) throw error
   revalidatePath('/q', 'layout')
-}
+})

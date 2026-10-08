@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import type { QReward } from '@/lib/q/types'
 import { formatQ } from '@/lib/q/points'
+import { cropStyle, toCrop } from '@/lib/q/crop'
 import Sheet from '../_components/Sheet'
 import RewardForm, { CATS } from './RewardForm'
 
@@ -14,7 +15,7 @@ export function ProductImage({ p }: { p: Product }) {
     <div className="q-product-img">
       {p.img ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.img} alt="" loading="lazy" />
+        <img src={p.img} alt="" loading="lazy" style={cropStyle(toCrop(p.image_crop))} />
       ) : (
         <span className="q-product-ph">{p.title.slice(0, 1)}</span>
       )}

@@ -1,5 +1,6 @@
 'use server'
 
+import { act } from '@/lib/q/act'
 import { revalidatePath } from 'next/cache'
 import { qAction } from '@/lib/q/db'
 import { addMonths, monthStart, quarterStart, today } from '@/lib/q/time'
@@ -36,7 +37,7 @@ function parseTiers(s: string | null): SpeedTier[] | null {
   return tiers.length ? tiers : null
 }
 
-export async function createMission(f: FormData) {
+export const createMission = act(async function createMission(f: FormData) {
   const db = await qAction()
   const t = today()
 
@@ -98,7 +99,7 @@ export async function createMission(f: FormData) {
     await db.from('q_mission_steps').insert(steps.map((title, i) => ({ mission_id: m.id, title, sort_order: i })))
   }
   done()
-}
+})
 
 async function getMission(id: string) {
   const db = await qAction()
@@ -107,7 +108,7 @@ async function getMission(id: string) {
   return { db, m }
 }
 
-export async function startMission(id: string) {
+export const startMission = act(async function startMission(id: string) {
   const { db, m } = await getMission(id)
   const t = today()
   if (m.status !== 'planned') return
@@ -115,10 +116,10 @@ export async function startMission(id: string) {
   if (t > missionPeriodEnd(m)) throw new Error('this mission’s period is over')
   await db.from('q_missions').update({ status: 'active', started_at: new Date().toISOString() }).eq('id', id)
   done()
-}
+})
 
 /** Check in for today (streak) or add progress (target). Returns Q$ paid if it completed. */
-export async function checkIn(id: string, f?: FormData): Promise<number> {
+export const checkIn = act(async function checkIn(id: string, f?: FormData): Promise<number> {
   const { db, m } = await getMission(id)
   if (m.status !== 'active') return 0
   const t = today()
@@ -145,9 +146,9 @@ export async function checkIn(id: string, f?: FormData): Promise<number> {
   }
   done()
   return 0
-}
+})
 
-export async function undoCheckIn(id: string) {
+export const undoCheckIn = act(async function undoCheckIn(id: string) {
   const db = await qAction()
   const { data } = await db
     .from('q_mission_checks')
@@ -158,17 +159,17 @@ export async function undoCheckIn(id: string) {
     .limit(1)
   if (data?.length) await db.from('q_mission_checks').delete().eq('id', data[0].id)
   done()
-}
+})
 
-export async function addSlip(id: string, f: FormData) {
+export const addSlip = act(async function addSlip(id: string, f: FormData) {
   const { db, m } = await getMission(id)
   if (m.status !== 'active') return
   await db.from('q_strikes').insert({ mission_id: id, kind: 'slip', note: str(f, 'note') })
   await checkStrikeLimit(db, m)
   done()
-}
+})
 
-export async function toggleStep(stepId: string, on: boolean): Promise<number> {
+export const toggleStep = act(async function toggleStep(stepId: string, on: boolean): Promise<number> {
   const db = await qAction()
   const { data: step, error } = await db.from('q_mission_steps').select('*').eq('id', stepId).single()
   if (error) throw error
@@ -191,27 +192,27 @@ export async function toggleStep(stepId: string, on: boolean): Promise<number> {
   }
   done()
   return 0
-}
+})
 
-export async function completeMission(id: string): Promise<number> {
+export const completeMission = act(async function completeMission(id: string): Promise<number> {
   const { db, m } = await getMission(id)
   if (m.status !== 'active') return 0
   await complete(db, m)
   done()
   const { data } = await db.from('q_missions').select('payout').eq('id', id).single()
   return data?.payout ?? 0
-}
+})
 
-export async function abandonMission(id: string) {
+export const abandonMission = act(async function abandonMission(id: string) {
   const { db, m } = await getMission(id)
   if (m.status !== 'planned' && m.status !== 'active') return
   await db.from('q_missions').update({ status: 'abandoned', completed_at: new Date().toISOString() }).eq('id', id)
   done()
-}
+})
 
-export async function deleteMission(id: string) {
+export const deleteMission = act(async function deleteMission(id: string) {
   const { db, m } = await getMission(id)
   if (m.status !== 'planned') throw new Error('only planned missions can be deleted')
   await db.from('q_missions').delete().eq('id', id)
   done()
-}
+})

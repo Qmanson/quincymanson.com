@@ -66,12 +66,19 @@ export type QProject = {
   created_at: string
 }
 
+export const URGENCIES = ['whenever', 'soon', 'asap'] as const
+export type Urgency = (typeof URGENCIES)[number]
+
+/** Picture framing: focal point x/y in %, zoom ≥ 1. */
+export type Crop = { x: number; y: number; z: number }
+
 export type QTask = {
   id: string
   domain: Domain
   title: string
   notes: string | null
   value: number
+  urgency: Urgency
   due_date: string | null
   project_id: string | null
   done_at: string | null
@@ -109,6 +116,7 @@ export type QLog = {
   rating: number | null
   tags: string[]
   photo_path: string | null
+  photo_crop: Json | null
   created_at: string
 }
 
@@ -251,7 +259,7 @@ export type QPayday = {
 }
 
 export type LedgerSource =
-  | 'routine' | 'task' | 'log' | 'mission' | 'review' | 'purchase' | 'decay' | 'manual'
+  | 'routine' | 'task' | 'log' | 'mission' | 'review' | 'purchase' | 'decay' | 'manual' | 'shift' | 'event'
 
 export type QLedger = {
   id: string
@@ -289,6 +297,7 @@ export type QReward = {
   usd_price: number | null
   image_path: string | null
   image_url: string | null
+  image_crop: Json | null
   notes: string | null
   status: 'available' | 'bought' | 'retired'
   sort_order: number
@@ -308,13 +317,51 @@ export type QState = {
   updated_at: string
 }
 
+export type QEvent = {
+  id: string
+  domain: Domain
+  title: string
+  happens_on: string | null
+  notes: string | null
+  status: 'planned' | 'done' | 'skipped'
+  log_id: string | null
+  created_at: string
+}
+
+export type QEventPerson = { event_id: string; person_id: string }
+
+export type QJob = {
+  id: string
+  name: string
+  wage: number
+  q_per_hour: number
+  active: boolean
+  created_at: string
+}
+
+export type QShift = {
+  id: string
+  job_id: string
+  worked_on: string
+  hours: number | null
+  location: string | null
+  wage: number | null
+  status: 'planned' | 'done'
+  note: string | null
+  created_at: string
+}
+
 export type QTables = {
+  q_events: QTable<QEvent, 'id' | 'domain' | 'status' | 'created_at'>
+  q_event_people: QTable<QEventPerson>
+  q_jobs: QTable<QJob, 'id' | 'wage' | 'q_per_hour' | 'active' | 'created_at'>
+  q_shifts: QTable<QShift, 'id' | 'status' | 'created_at'>
   q_state: QTable<QState, 'updated_at'>
   q_themes: QTable<QTheme, 'id' | 'created_at'>
   q_routines: QTable<QRoutine, 'id' | 'value' | 'starts_on' | 'active' | 'sort_order' | 'created_at'>
   q_routine_checks: QTable<QRoutineCheck, 'id' | 'created_at'>
   q_projects: QTable<QProject, 'id' | 'status' | 'sort_order' | 'created_at'>
-  q_tasks: QTable<QTask, 'id' | 'value' | 'sort_order' | 'created_at'>
+  q_tasks: QTable<QTask, 'id' | 'value' | 'urgency' | 'sort_order' | 'created_at'>
   q_log_types: QTable<QLogType, 'id' | 'kind' | 'value' | 'active' | 'sort_order' | 'created_at'>
   q_logs: QTable<QLog, 'id' | 'logged_on' | 'data' | 'tags' | 'created_at'>
   q_media: QTable<QMedia, 'id' | 'created_at'>

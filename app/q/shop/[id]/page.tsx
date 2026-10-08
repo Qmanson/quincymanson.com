@@ -3,6 +3,7 @@ import { qPage } from '@/lib/q/db'
 import { getBalances } from '@/lib/q/ledger'
 import { signPaths } from '@/lib/q/media'
 import { getRate } from '@/lib/q/rate'
+import { cropStyle, toCrop } from '@/lib/q/crop'
 import { formatQ } from '@/lib/q/points'
 import { dateOf, relativeDay } from '@/lib/q/time'
 import ProductActions from './ProductActions'
@@ -27,7 +28,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <div className="q-hero-img">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt="" />
+          <img src={img} alt="" style={cropStyle(toCrop(r.image_crop))} />
         ) : (
           <span className="q-product-ph" style={{ fontSize: 96, fontFamily: 'var(--font-q-display)', color: 'var(--faint)' }}>
             {r.title.slice(0, 1)}

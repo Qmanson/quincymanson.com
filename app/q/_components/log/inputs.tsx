@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { compressImage } from '@/lib/imageCompress'
-import type { LiftSet, MediaKind } from '@/lib/q/types'
+import type { Crop, LiftSet, MediaKind } from '@/lib/q/types'
+import { cropStyle, NO_CROP } from '@/lib/q/crop'
 import type { MediaHit } from '@/lib/q/media'
 
 // ── rating: 5 stars, half steps ─────────────────────────────
@@ -140,8 +141,8 @@ export function Cover({ url, kind, size = 48 }: { url: string | null; kind: Medi
 
 // ── people at an event ──────────────────────────────────────
 
-export function PeoplePicker({ people }: { people: { id: string; name: string }[] }) {
-  const [ids, setIds] = useState<string[]>([])
+export function PeoplePicker({ people, initial = [] }: { people: { id: string; name: string }[]; initial?: string[] }) {
+  const [ids, setIds] = useState<string[]>(initial)
   const [fresh, setFresh] = useState<string[]>([])
   const [q, setQ] = useState('')
 
@@ -193,16 +194,38 @@ export function PeoplePicker({ people }: { people: { id: string; name: string }[
   )
 }
 
-// ── photo upload (straight to private storage) ──────────────
+// ── photo upload (straight to private storage) + framing ────
 
-export function PhotoInput({ name, folder, initialUrl }: { name: string; folder: string; initialUrl?: string | null }) {
+export function PhotoInput({
+  name,
+  cropName,
+  folder,
+  initialUrl,
+  initialCrop,
+  fallbackUrl,
+  aspect = '4 / 5',
+}: {
+  name: string
+  cropName: string
+  folder: string
+  initialUrl?: string | null
+  initialCrop?: Crop | null
+  /** e.g. a pasted image link, shown when nothing's uploaded */
+  fallbackUrl?: string | null
+  aspect?: string
+}) {
   const [path, setPath] = useState<string>('')
-  const [preview, setPreview] = useState<string | null>(initialUrl ?? null)
+  const [picked, setPicked] = useState<string | null>(null)
+  const [crop, setCrop] = useState<Crop>(initialCrop ?? NO_CROP)
   const [state, setState] = useState<'idle' | 'uploading' | string>('idle')
   const ref = useRef<HTMLInputElement>(null)
+  const frame = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ x: number; y: number; c: Crop } | null>(null)
+  const src = picked ?? initialUrl ?? fallbackUrl ?? null
 
   async function pick(file: File) {
-    setPreview(URL.createObjectURL(file))
+    setPicked(URL.createObjectURL(file))
+    setCrop(NO_CROP)
     setState('uploading')
     try {
       const small = await compressImage(file, { targetBytes: 900 * 1024, maxDimension: 2000 })
@@ -217,9 +240,12 @@ export function PhotoInput({ name, folder, initialUrl }: { name: string; folder:
     }
   }
 
+  const clamp = (v: number) => Math.max(0, Math.min(100, v))
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <input type="hidden" name={name} value={path} />
+      <input type="hidden" name={cropName} value={src ? JSON.stringify(crop) : ''} />
       <input
         ref={ref}
         type="file"
@@ -227,14 +253,54 @@ export function PhotoInput({ name, folder, initialUrl }: { name: string; folder:
         style={{ display: 'none' }}
         onChange={e => e.target.files?.[0] && pick(e.target.files[0])}
       />
-      <button type="button" className="q-photo-drop" onClick={() => ref.current?.click()}>
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="" />
-        ) : (
+      {src ? (
+        <>
+          <div
+            ref={frame}
+            className="q-photo-frame"
+            style={{ aspectRatio: aspect }}
+            onPointerDown={e => {
+              drag.current = { x: e.clientX, y: e.clientY, c: crop }
+              e.currentTarget.setPointerCapture(e.pointerId)
+            }}
+            onPointerMove={e => {
+              const d = drag.current
+              const box = frame.current?.getBoundingClientRect()
+              if (!d || !box) return
+              // drag the picture: moving right shows more of the left side
+              setCrop({
+                ...d.c,
+                x: clamp(d.c.x - ((e.clientX - d.x) / box.width) * 100 / d.c.z),
+                y: clamp(d.c.y - ((e.clientY - d.y) / box.height) * 100 / d.c.z),
+              })
+            }}
+            onPointerUp={() => { drag.current = null }}
+            onPointerCancel={() => { drag.current = null }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt="" draggable={false} style={cropStyle(crop)} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="q-tiny q-dim">zoom</span>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.01}
+              value={crop.z}
+              onChange={e => setCrop({ ...crop, z: Number(e.target.value) })}
+              style={{ flex: 1, padding: 0, border: 'none', background: 'none', boxShadow: 'none' }}
+            />
+            <button type="button" className="q-btn is-small" onClick={() => setCrop(NO_CROP)}>reset</button>
+            <button type="button" className="q-btn is-small" onClick={() => ref.current?.click()}>new</button>
+          </div>
+          <p className="q-tiny q-faint">drag the picture to move it</p>
+        </>
+      ) : (
+        <button type="button" className="q-photo-drop" style={{ aspectRatio: aspect }} onClick={() => ref.current?.click()}>
           <span className="q-dim">tap to add a photo</span>
-        )}
-      </button>
+        </button>
+      )}
       {state === 'uploading' && <p className="q-small q-dim">uploading…</p>}
       {state !== 'idle' && state !== 'uploading' && <p className="q-small q-neg">✕ {state}</p>}
     </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { SUBSTANCES, type Domain, type LogKind, type QLogType, type QRoutine, type QTask } from '@/lib/q/types'
+import { SUBSTANCES, URGENCIES, type Domain, type LogKind, type QLogType, type QRoutine, type QTask } from '@/lib/q/types'
 import { TASK_SIZES } from '@/lib/q/points'
 import { today } from '@/lib/q/time'
 import {
@@ -15,6 +15,7 @@ import {
   updateTask,
 } from '../actions'
 import QForm from './Form'
+import { unwrap } from '@/lib/q/act'
 import { DomainPicker, Seg } from './Pickers'
 import { LiftRows, MediaPicker, PeoplePicker, PhotoInput, Stars, TagInput } from './log/inputs'
 
@@ -22,24 +23,43 @@ type Done = { onDone?: () => void }
 
 // ── task ────────────────────────────────────────────────────
 
-export function TaskForm({ task, domain, onDone }: Done & { task?: QTask; domain?: Domain }) {
+export function TaskForm({
+  task,
+  domain,
+  projectId,
+  projects = [],
+  onDone,
+}: Done & {
+  task?: QTask
+  domain?: Domain
+  projectId?: string
+  projects?: { id: string; title: string; domain: Domain }[]
+}) {
   const [value, setValue] = useState(task?.value ?? TASK_SIZES.S)
+  const [due, setDue] = useState(task?.due_date ?? '')
+  const sizes = Object.keys(TASK_SIZES) as (keyof typeof TASK_SIZES)[]
   return (
     <QForm action={task ? updateTask.bind(null, task.id) : createTask} onDone={onDone}>
       <label className="q-field">
         what
-        <input name="title" required defaultValue={task?.title} placeholder="fix closet light" autoFocus={!task} />
+        <textarea name="title" required rows={2} defaultValue={task?.title} placeholder="fix closet light" autoFocus={!task} />
       </label>
       <DomainPicker initial={task?.domain ?? domain} />
+      <div className="q-field">
+        how urgent
+        <Seg
+          name="urgency"
+          initial={task?.urgency ?? 'whenever'}
+          options={URGENCIES.map(u => ({ value: u, label: u }))}
+        />
+        {due && <span className="q-small q-dim">has a date, so it sorts itself by how close it is</span>}
+      </div>
       <div className="q-field">
         size
         <Seg
           name="size"
-          initial={(Object.keys(TASK_SIZES) as (keyof typeof TASK_SIZES)[]).find(k => TASK_SIZES[k] === value)}
-          options={(Object.keys(TASK_SIZES) as (keyof typeof TASK_SIZES)[]).map(k => ({
-            value: k,
-            label: `${k} · ${TASK_SIZES[k]}`,
-          }))}
+          initial={sizes.find(k => TASK_SIZES[k] === value)}
+          options={sizes.map(k => ({ value: k, label: `${k} · ${TASK_SIZES[k]}` }))}
           onChange={k => setValue(TASK_SIZES[k])}
         />
       </div>
@@ -50,9 +70,21 @@ export function TaskForm({ task, domain, onDone }: Done & { task?: QTask; domain
         </label>
         <label className="q-field">
           due
-          <input name="due_date" type="date" defaultValue={task?.due_date ?? ''} />
+          <input name="due_date" type="date" value={due} onChange={e => setDue(e.target.value)} />
         </label>
       </div>
+      {projects.length > 0 && (
+        <label className="q-field">
+          project
+          <select name="project_id" defaultValue={task?.project_id ?? projectId ?? ''}>
+            <option value="">— none —</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.title} · {p.domain}</option>)}
+          </select>
+        </label>
+      )}
+      {projects.length === 0 && (task?.project_id || projectId) && (
+        <input type="hidden" name="project_id" value={task?.project_id ?? projectId} />
+      )}
       <label className="q-field">
         notes
         <textarea name="notes" rows={2} defaultValue={task?.notes ?? ''} />
@@ -173,13 +205,13 @@ export function LogTypeForm({ logType, domain, onDone }: Done & { logType?: QLog
   )
 }
 
-type Aux = Awaited<ReturnType<typeof logFormData>>
+type Aux = { workouts: string[]; people: { id: string; name: string }[]; tags: string[] }
 
 export function LogForm({ logType, onDone }: Done & { logType: QLogType }) {
   const [aux, setAux] = useState<Aux>({ workouts: [], people: [], tags: [] })
   useEffect(() => {
     let live = true
-    logFormData(logType.id).then(a => live && setAux(a)).catch(() => {})
+    logFormData(logType.id).then(a => live && setAux(unwrap(a))).catch(() => {})
     return () => { live = false }
   }, [logType.id])
 
@@ -271,7 +303,7 @@ export function LogForm({ logType, onDone }: Done & { logType: QLogType }) {
 
       {k === 'photo' && (
         <>
-          <PhotoInput name="photo_path" folder="logs" />
+          <PhotoInput name="photo_path" cropName="photo_crop" folder="logs" />
           <div className="q-field">tags<TagInput name="tags" suggestions={aux.tags} /></div>
           {day}
           <label className="q-field">note<textarea name="note" rows={2} /></label>

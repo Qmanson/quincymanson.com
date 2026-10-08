@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from './Toast'
+import { unwrap } from '@/lib/q/act'
 
 /**
  * Form that runs a server action. When there's an onDone (i.e. it lives in
@@ -34,13 +35,14 @@ export default function QForm({
           onDone()
           toast('saving…')
           action(f)
+            .then(unwrap)
             .then(r => toast(typeof r === 'number' && r !== 0 ? r : 'saved ✓'))
             .catch(err => toast(`✕ ${err instanceof Error ? err.message : 'didn’t save'}`))
           return
         }
         start(async () => {
           try {
-            const r = await action(f)
+            const r = unwrap(await action(f))
             if (typeof r === 'number') toast(r)
           } catch (err) {
             setError(err instanceof Error ? err.message : 'something broke')

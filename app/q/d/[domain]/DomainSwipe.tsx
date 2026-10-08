@@ -40,7 +40,7 @@ export default function DomainSwipe({ current }: { current: Domain }) {
       const dx = t.clientX - x0
       const dy = t.clientY - y0
       if (Math.abs(dx) < SWIPE_PX || Math.abs(dy) > Math.abs(dx) * 0.6) return
-      router.push(`/q/d/${dx < 0 ? next : prev}`)
+      router.replace(`/q/d/${dx < 0 ? next : prev}`)
     }
     window.addEventListener('touchstart', down, { passive: true })
     window.addEventListener('touchend', up, { passive: true })

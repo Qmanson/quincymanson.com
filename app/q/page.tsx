@@ -16,12 +16,18 @@ import {
   yearStart,
 } from '@/lib/q/time'
 import { lateValue } from '@/lib/q/points'
-import type { QRoutine } from '@/lib/q/types'
-import { doLate, toggleRoutine, toggleRoutineOn, toggleTask } from './actions'
+import type { Domain, QRoutine, QTask } from '@/lib/q/types'
+import { urgencyOf } from '@/lib/q/tasks'
+import { eventValue, loadEvents, loadPeople, loadWork } from '@/lib/q/loaders'
+import { doLate, toggleRoutine, toggleRoutineOn } from './actions'
 import CheckRow from './_components/CheckRow'
 import QuickLog from './_components/QuickLog'
 import AddFab from './_components/AddFab'
 import MissionStrip from './missions/MissionStrip'
+import TaskList from './_components/TaskList'
+import Events from './_components/Events'
+import { ClaimShifts } from './_components/Work'
+import { completeEvent } from './plan/actions'
 
 // Interval routines show up this many days before they're due.
 const INTERVAL_HEADS_UP = 3
@@ -51,8 +57,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
     db
       .from('q_tasks')
       .select('*')
-      .or(`done_at.is.null,done_at.gte.${addDays(t, -1)}`)
-      .order('due_date', { ascending: true, nullsFirst: false }),
+      .or(`done_at.is.null,done_at.gte.${addDays(t, -1)}`),
     db.from('q_log_types').select('*').eq('active', true).order('sort_order').order('created_at'),
     db
       .from('q_routine_checks')
@@ -62,6 +67,12 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
       .limit(500),
     db.from('q_missions').select('*').eq('status', 'active').order('created_at'),
     db.from('q_routine_checks').select('routine_id, period_start, status').gte('period_start', first).lte('period_start', t),
+  ])
+  const [events, people, evValue, work] = await Promise.all([
+    loadEvents(db, { until: addDays(t, 14) }),
+    loadPeople(db),
+    eventValue(db),
+    loadWork(db),
   ])
 
   const routines = routinesRes.data ?? []
@@ -168,10 +179,24 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
     return r && r.cadence !== 'daily' ? [{ c, r }] : []
   })
 
-  const horizon = addDays(t, 7)
-  const tasks = (tasksRes.data ?? []).filter(
-    task => task.done_at || (task.due_date && task.due_date <= horizon),
-  )
+  // Today's list: dailies + anything on the clock that's due today + events
+  // happening today. Tasks due today (or overdue, or undated asap) follow.
+  const dueToday = (x: { r: QRoutine; end: string }) => x.end <= t
+  const clockToday = upcoming.filter(dueToday)
+  const clockLater = upcoming.filter(x => !dueToday(x))
+
+  const openTasks = (tasksRes.data ?? []).filter(x => !x.done_at)
+  const recentlyDone = (tasksRes.data ?? []).filter(x => x.done_at)
+  const taskToday = (x: QTask) => (x.due_date ? x.due_date <= t : x.urgency === 'asap')
+  const tasksToday = [...openTasks.filter(taskToday), ...recentlyDone.filter(taskToday)]
+  const tasksSoon = openTasks.filter(x => !taskToday(x) && urgencyOf(x, t) !== 'whenever')
+
+  const eventsToday = events.filter(e => e.happens_on && e.happens_on <= t)
+  const eventsSoon = events.filter(e => e.happens_on && e.happens_on > t)
+
+  const total = daily.length + clockToday.length + eventsToday.length
+  const doneCount = dailyDone + clockToday.filter(x => isDone(x.r)).length
+  const tag = (d: Domain) => <span className="q-tag" data-d={d}>{d}</span>
 
   return (
     <main className="q-main">
@@ -193,38 +218,54 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
 
       <section className="q-panel">
         <div className="q-panel-title">
-          <span>▸ <b>daily</b></span>
-          <span className={dailyDone === daily.length && daily.length ? 'q-pos' : ''}>
-            {dailyDone}/{daily.length}
-          </span>
+          <span>▸ <b>today</b></span>
+          <span className={doneCount === total && total ? 'q-pos' : ''}>{doneCount}/{total}</span>
         </div>
-        {daily.length ? (
-          daily.map(r => (
-            <CheckRow
-              key={r.id}
-              title={r.title}
-              sub={<span className="q-tag" data-d={r.domain}>{r.domain}</span>}
-              value={r.value}
-              domain={r.domain}
-              done={isDone(r)}
-              onToggle={toggleRoutine.bind(null, r.id)}
-            />
-          ))
-        ) : (
-          <p className="q-empty">no daily routines yet — tap + to add one</p>
-        )}
+        {total === 0 && <p className="q-empty">nothing yet — tap + to add a routine</p>}
+        {daily.map(r => (
+          <CheckRow key={r.id} title={r.title} sub={tag(r.domain)} value={r.value} domain={r.domain} done={isDone(r)} onToggle={toggleRoutine.bind(null, r.id)} />
+        ))}
+        {clockToday.map(({ r, sub }) => (
+          <CheckRow
+            key={r.id}
+            title={r.title}
+            sub={<>{tag(r.domain)}<span>{sub}</span></>}
+            value={r.value}
+            domain={r.domain}
+            done={isDone(r)}
+            onToggle={toggleRoutine.bind(null, r.id)}
+          />
+        ))}
+        {eventsToday.map(ev => (
+          <CheckRow
+            key={ev.id}
+            title={ev.title}
+            sub={<>{tag(ev.domain)}<span>event{ev.people.length ? ` · with ${ev.people.map(p => p.name).join(', ')}` : ''}</span></>}
+            value={evValue}
+            domain={ev.domain}
+            done={false}
+            oneWay
+            onToggle={completeEvent.bind(null, ev.id)}
+          />
+        ))}
       </section>
+
+      {tasksToday.length > 0 && <TaskList tasks={tasksToday} today={t} showDomain grouped={false} title="tasks for today" />}
+
+      <ClaimShifts shifts={work.planned.filter(s => s.worked_on <= t)} jobs={work.jobs} locations={work.locations} />
 
       {logTypesRes.data && logTypesRes.data.length > 0 && <QuickLog logTypes={logTypesRes.data} />}
 
-      {upcoming.length > 0 && (
+      {eventsSoon.length > 0 && <Events events={eventsSoon} people={people} value={evValue} today={t} />}
+
+      {clockLater.length > 0 && (
         <section className="q-panel">
           <div className="q-panel-title"><span>▸ <b>on the clock</b></span></div>
-          {upcoming.map(({ r, sub }) => (
+          {clockLater.map(({ r, sub }) => (
             <CheckRow
               key={r.id}
               title={r.title}
-              sub={<><span className="q-tag" data-d={r.domain}>{r.domain}</span><span>{sub}</span></>}
+              sub={<>{tag(r.domain)}<span>{sub}</span></>}
               value={r.value}
               domain={r.domain}
               done={isDone(r)}
@@ -234,31 +275,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
         </section>
       )}
 
-      {tasks.length > 0 && (
-        <section className="q-panel">
-          <div className="q-panel-title"><span>▸ <b>tasks</b> due this week</span></div>
-          {tasks.map(task => (
-            <CheckRow
-              key={task.id}
-              title={task.title}
-              sub={
-                <>
-                  <span className="q-tag" data-d={task.domain}>{task.domain}</span>
-                  {task.due_date && (
-                    <span className={task.due_date < t && !task.done_at ? 'q-neg' : ''}>
-                      {relativeDay(task.due_date, t)}
-                    </span>
-                  )}
-                </>
-              }
-              value={task.value}
-              domain={task.domain}
-              done={!!task.done_at}
-              onToggle={toggleTask.bind(null, task.id)}
-            />
-          ))}
-        </section>
-      )}
+      {tasksSoon.length > 0 && <TaskList tasks={tasksSoon} today={t} showDomain title="coming up" />}
 
       {missed.length > 0 && (
         <section className="q-panel">
@@ -269,7 +286,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
             <CheckRow
               key={c.id}
               title={r.title}
-              sub={<><span className="q-tag" data-d={r.domain}>{r.domain}</span><span>{relativeDay(c.period_start, t)}</span></>}
+              sub={<>{tag(r.domain)}<span>{relativeDay(c.period_start, t)}</span></>}
               value={lateValue(r)}
               domain={r.domain}
               done={false}

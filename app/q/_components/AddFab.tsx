@@ -9,7 +9,13 @@ type Kind = 'task' | 'routine' | 'log type'
 const KINDS: Kind[] = ['task', 'routine', 'log type']
 
 /** Floating + that opens a sheet for adding a task, routine or log type. */
-export default function AddFab({ domain }: { domain?: Domain }) {
+export default function AddFab({
+  domain,
+  projects,
+}: {
+  domain?: Domain
+  projects?: { id: string; title: string; domain: Domain }[]
+}) {
   const [open, setOpen] = useState(false)
   const [kind, setKind] = useState<Kind>('task')
   const close = () => setOpen(false)
@@ -23,7 +29,7 @@ export default function AddFab({ domain }: { domain?: Domain }) {
             <button key={k} type="button" className={k === kind ? 'is-on' : ''} onClick={() => setKind(k)}>{k}</button>
           ))}
         </div>
-        {kind === 'task' && <TaskForm key="t" domain={domain} onDone={close} />}
+        {kind === 'task' && <TaskForm key="t" domain={domain} projects={projects} onDone={close} />}
         {kind === 'routine' && <RoutineForm key="r" domain={domain} onDone={close} />}
         {kind === 'log type' && <LogTypeForm key="l" domain={domain} onDone={close} />}
       </Sheet>

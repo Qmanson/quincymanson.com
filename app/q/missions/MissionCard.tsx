@@ -7,6 +7,7 @@ import { formatQ } from '@/lib/q/points'
 import Sheet from '../_components/Sheet'
 import QForm from '../_components/Form'
 import { toast } from '../_components/Toast'
+import { unwrap } from '@/lib/q/act'
 import {
   abandonMission,
   addSlip,
@@ -35,7 +36,7 @@ export default function MissionCard({ m, v, compact }: { m: QMission; v?: Missio
   function run(fn: () => Promise<unknown>) {
     start(async () => {
       try {
-        const r = await fn()
+        const r = unwrap(await fn())
         if (typeof r === 'number') toast(r)
       } catch (e) {
         toast(e instanceof Error ? `✕ ${e.message}` : '✕ failed')

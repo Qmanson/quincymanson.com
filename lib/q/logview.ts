@@ -1,7 +1,8 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types'
-import type { LiftSet, LogKind, MediaKind, QLog, QLogType } from './types'
+import type { Crop, LiftSet, LogKind, MediaKind, QLog, QLogType } from './types'
+import { toCrop } from './crop'
 import { signPaths } from './media'
 
 type DB = SupabaseClient<Database>
@@ -20,6 +21,7 @@ export type LogView = {
   cover: string | null
   mediaKind: MediaKind | null
   photo: string | null
+  photoCrop: Crop
   people: string[]
 }
 
@@ -113,6 +115,7 @@ export async function viewLogs(db: DB, logs: QLog[], types: QLogType[]): Promise
       cover: m?.cover_url ?? null,
       mediaKind: m?.kind ?? null,
       photo: l.photo_path ? photos.get(l.photo_path) ?? null : null,
+      photoCrop: toCrop(l.photo_crop),
       people: (links ?? []).filter(x => x.log_id === l.id).map(x => nameById.get(x.person_id) ?? '?'),
     }
   })

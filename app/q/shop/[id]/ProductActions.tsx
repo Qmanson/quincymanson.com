@@ -6,6 +6,7 @@ import type { QReward } from '@/lib/q/types'
 import { formatQ } from '@/lib/q/points'
 import Sheet from '../../_components/Sheet'
 import { toast } from '../../_components/Toast'
+import { unwrap } from '@/lib/q/act'
 import RewardForm from '../RewardForm'
 import { buyReward, removeRewardImage, retireReward } from '../actions'
 
@@ -27,7 +28,7 @@ export default function ProductActions({
   function run(fn: () => Promise<unknown>, after?: () => void) {
     start(async () => {
       try {
-        const n = await fn()
+        const n = unwrap(await fn())
         if (typeof n === 'number') toast(n)
         after?.()
       } catch (e) {
