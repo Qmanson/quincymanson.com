@@ -60,7 +60,7 @@ create table if not exists q_routines (
   interval_days int check (interval_days is null or interval_days > 0),
   value int not null default 10,
   miss_penalty int,              -- null = half of value
-  starts_on date not null default current_date,
+  starts_on date not null default ((now() at time zone 'America/Chicago')::date),
   active boolean not null default true,
   sort_order int not null default 0,
   notes text,
