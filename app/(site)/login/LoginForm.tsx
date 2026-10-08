@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import { LOGIN } from '@/lib/content'
 
 export default function LoginForm({ next = '/' }: { next?: string }) {
@@ -10,7 +9,6 @@ export default function LoginForm({ next = '/' }: { next?: string }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,7 +19,8 @@ export default function LoginForm({ next = '/' }: { next?: string }) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) { setError(error.message); setLoading(false) }
-    else { router.push(next); router.refresh() }
+    // full load so iOS re-reads the page's viewport / home-screen meta
+    else window.location.assign(next)
   }
 
   return (
