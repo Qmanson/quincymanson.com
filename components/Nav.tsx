@@ -3,17 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
-import { signOut } from '@/app/login/actions'
+import { signOut } from '@/app/(site)/login/actions'
 import { SITE, NAV } from '@/lib/content'
 
 const NAV_LINKS = [
   { href: '/blog', label: NAV.blog },
   { href: '/art', label: NAV.art },
-  { href: '/trackers', label: NAV.trackers },
   { href: '/links', label: NAV.links },
 ]
 
-export default function Nav({ user }: { isAdmin: boolean; user: User | null }) {
+export default function Nav({ isAdmin, user }: { isAdmin: boolean; user: User | null }) {
   const pathname = usePathname()
 
   return (
@@ -51,6 +50,15 @@ export default function Nav({ user }: { isAdmin: boolean; user: User | null }) {
                 </Link>
               )
             })}
+            {isAdmin && (
+              <Link
+                href="/q"
+                className="btn"
+                style={{ textDecoration: 'none', fontFamily: 'Courier New, monospace', fontSize: 12, fontWeight: 'bold' }}
+              >
+                [Q]
+              </Link>
+            )}
             {user ? (
               <form action={signOut}>
                 <button type="submit" style={{ fontFamily: 'Courier New, monospace', fontSize: 12 }}>
