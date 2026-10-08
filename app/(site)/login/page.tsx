@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getUser } from '@/lib/auth'
+import { getUser, isAdmin } from '@/lib/auth'
 import LoginForm from './LoginForm'
 import { LOGIN } from '@/lib/content'
 
@@ -12,7 +12,9 @@ export default async function LoginPage({
   // only allow internal paths
   const dest = next && /^\/(?![/\\])/.test(next) ? next : '/'
   const user = await getUser()
-  if (user) redirect(dest)
+  // q bounces non-admins here, so only send them back if they can get in
+  if (user && (!dest.startsWith('/q') || (await isAdmin()))) redirect(dest)
+  if (user) redirect('/')
 
   return (
     <div className="window max-w-sm mx-auto mt-12">

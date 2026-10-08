@@ -40,20 +40,20 @@ insert into q_routines (domain, title, cadence, interval_days, value, sort_order
 
 -- ── log types ───────────────────────────────────────────────
 insert into q_log_types (domain, name, unit, value, icon, sort_order) values
-  ('body', 'lift',        'min', 25, '🏋', 1),
-  ('body', 'run',         'mi',  25, '🏃', 2),
-  ('body', 'bike',        'mi',  20, '🚲', 3),
-  ('body', 'walk',        'mi',  10, '🚶', 4),
-  ('body', 'meditate',    'min', 15, '🧘', 5),
-  ('body', 'substances',  null,  0,  '◌',  6),
-  ('arts', 'movie',       null,  15, '🎬', 7),
-  ('arts', 'book finished', null, 100, '📖', 8),
-  ('arts', 'album',       null,  10, '💿', 9),
-  ('city', 'event',       null,  30, '🎟', 10),
-  ('styl', 'fit pic',     null,  15, '📸', 11),
-  ('crew', 'letter sent', null,  40, '✉', 12),
-  ('crew', 'kind act',    null,  25, '♥', 13),
-  ('home', 'laundry load', null, 0,  '🧺', 14);
+  ('body', 'lift',        'min', 25, '', 1),
+  ('body', 'run',         'mi',  25, '', 2),
+  ('body', 'bike',        'mi',  20, '', 3),
+  ('body', 'walk',        'mi',  10, '', 4),
+  ('body', 'meditate',    'min', 15, '', 5),
+  ('body', 'substances',  null,  0,  '',  6),
+  ('arts', 'movie',       null,  15, '', 7),
+  ('arts', 'book finished', null, 100, '', 8),
+  ('arts', 'album',       null,  10, '', 9),
+  ('city', 'event',       null,  30, '', 10),
+  ('styl', 'fit pic',     null,  15, '', 11),
+  ('crew', 'letter sent', null,  40, '', 12),
+  ('crew', 'kind act',    null,  25, '', 13),
+  ('home', 'laundry load', null, 0,  '', 14);
 
 -- ── shop: purchase wants ────────────────────────────────────
 insert into q_rewards (title, category, domain, cost) values
