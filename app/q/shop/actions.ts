@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { qAction } from '@/lib/q/db'
 import { add, getBalances } from '@/lib/q/ledger'
 import { BUCKET } from '@/lib/q/media'
+import { getRate, setRate } from '@/lib/q/rate'
 import { addDays, dateOf, today } from '@/lib/q/time'
 import { DOMAINS, type Domain, type QReward } from '@/lib/q/types'
 
@@ -14,16 +15,29 @@ function str(f: FormData, k: string): string | null {
   return typeof v === 'string' && v.trim() ? v.trim() : null
 }
 
-function fields(f: FormData) {
+/** Apply a changed exchange rate first, then work out this item's Q$ cost. */
+async function priced(db: Awaited<ReturnType<typeof qAction>>, f: FormData) {
+  let rate = await getRate(db)
+  const asked = Number(str(f, 'rate'))
+  if (Number.isFinite(asked) && asked > 0 && asked !== rate) {
+    await setRate(db, asked)
+    rate = asked
+  }
+  const usd = Number(str(f, 'usd_price'))
+  const usd_price = Number.isFinite(usd) && usd > 0 ? Math.round(usd * 100) / 100 : null
+  const cost = usd_price !== null ? Math.round(usd_price * rate) : Math.round(Number(str(f, 'cost')))
+  if (!Number.isFinite(cost) || cost <= 0) throw new Error('set a price')
+  return { usd_price, cost }
+}
+
+function fields(f: FormData, price: { usd_price: number | null; cost: number }) {
   const title = str(f, 'title')
   if (!title) throw new Error('title is required')
-  const cost = Math.round(Number(str(f, 'cost')))
-  if (!Number.isFinite(cost) || cost <= 0) throw new Error('set a price')
   const category = (str(f, 'category') ?? 'want') as QReward['category']
   const d = str(f, 'domain')
   return {
     title,
-    cost,
+    ...price,
     category: CATEGORIES.includes(category) ? category : 'want',
     domain: d && (DOMAINS as readonly string[]).includes(d) ? (d as Domain) : null,
     repeatable: f.get('repeatable') === 'on',
@@ -38,14 +52,14 @@ function fields(f: FormData) {
 
 export async function createReward(f: FormData) {
   const db = await qAction()
-  const { error } = await db.from('q_rewards').insert(fields(f))
+  const { error } = await db.from('q_rewards').insert(fields(f, await priced(db, f)))
   if (error) throw error
   revalidatePath('/q', 'layout')
 }
 
 export async function updateReward(id: string, f: FormData) {
   const db = await qAction()
-  const { error } = await db.from('q_rewards').update(fields(f)).eq('id', id)
+  const { error } = await db.from('q_rewards').update(fields(f, await priced(db, f))).eq('id', id)
   if (error) throw error
   revalidatePath('/q', 'layout')
 }

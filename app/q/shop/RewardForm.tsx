@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import type { QReward } from '@/lib/q/types'
+import { formatQ } from '@/lib/q/points'
 import QForm from '../_components/Form'
 import { DomainPicker, Seg } from '../_components/Pickers'
 import { PhotoInput } from '../_components/log/inputs'
@@ -13,7 +15,25 @@ export const CATS = [
   { value: 'other', label: 'other' },
 ] as const
 
-export default function RewardForm({ r, imageSrc, onDone }: { r?: QReward; imageSrc?: string | null; onDone: () => void }) {
+export default function RewardForm({
+  r,
+  rate: initialRate,
+  imageSrc,
+  onDone,
+}: {
+  r?: QReward
+  rate: number
+  imageSrc?: string | null
+  onDone: () => void
+}) {
+  const [usd, setUsd] = useState(r?.usd_price != null ? String(r.usd_price) : '')
+  const [rate, setRate] = useState(String(initialRate))
+  const usdN = Number(usd)
+  const rateN = Number(rate)
+  const hasUsd = usd !== '' && usdN > 0
+  const preview = hasUsd && rateN > 0 ? Math.round(usdN * rateN) : null
+  const rateChanged = rateN > 0 && rateN !== initialRate
+
   return (
     <QForm action={r ? updateReward.bind(null, r.id) : createReward} onDone={onDone}>
       <PhotoInput name="image_path" folder="shop" initialUrl={imageSrc} />
@@ -25,16 +45,38 @@ export default function RewardForm({ r, imageSrc, onDone }: { r?: QReward; image
         what
         <input name="title" required defaultValue={r?.title} placeholder="seiko 5" />
       </label>
-      <div className="q-form-row">
-        <label className="q-field">
-          price Q$
-          <input name="cost" type="number" inputMode="numeric" required defaultValue={r?.cost} placeholder="5000" />
-        </label>
-        <label className="q-field">
-          cooldown days
-          <input name="cooldown_days" type="number" inputMode="numeric" defaultValue={r?.cooldown_days ?? ''} placeholder="—" />
-        </label>
+      <div className="q-panel" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="q-form-row">
+          <label className="q-field">
+            real price $
+            <input name="usd_price" type="number" inputMode="decimal" step="0.01" min="0" value={usd} onChange={e => setUsd(e.target.value)} placeholder="129.99" />
+          </label>
+          <label className="q-field">
+            rate · Q$ per $1
+            <input name="rate" type="number" inputMode="decimal" step="any" min="0" value={rate} onChange={e => setRate(e.target.value)} />
+          </label>
+        </div>
+        {hasUsd ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span className="q-tiny q-dim">costs</span>
+            <span className="q-price">Q$ {preview !== null ? formatQ(preview) : '—'}</span>
+          </div>
+        ) : (
+          <label className="q-field">
+            or set Q$ directly
+            <input name="cost" type="number" inputMode="numeric" defaultValue={r?.usd_price == null ? r?.cost : undefined} placeholder="5000" />
+          </label>
+        )}
+        {rateChanged && (
+          <p className="q-small" style={{ color: 'var(--warn)' }}>
+            saving reprices everything with a $ price at {rate} Q$ per $1
+          </p>
+        )}
       </div>
+      <label className="q-field">
+        cooldown days
+        <input name="cooldown_days" type="number" inputMode="numeric" defaultValue={r?.cooldown_days ?? ''} placeholder="— (repeatables only)" />
+      </label>
       <div className="q-field">
         kind
         <Seg name="category" initial={r?.category ?? 'want'} options={CATS} />

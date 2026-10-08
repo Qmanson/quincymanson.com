@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { qPage } from '@/lib/q/db'
 import { getBalances } from '@/lib/q/ledger'
 import { signPaths } from '@/lib/q/media'
+import { getRate } from '@/lib/q/rate'
 import { formatQ } from '@/lib/q/points'
 import { dateOf, relativeDay } from '@/lib/q/time'
 import ProductActions from './ProductActions'
@@ -9,10 +10,11 @@ import ProductActions from './ProductActions'
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const db = await qPage()
-  const [{ data: r }, { balance }, { data: purchases }] = await Promise.all([
+  const [{ data: r }, { balance }, { data: purchases }, rate] = await Promise.all([
     db.from('q_rewards').select('*').eq('id', id).maybeSingle(),
     getBalances(db),
     db.from('q_purchases').select('*').eq('reward_id', id).order('purchased_at', { ascending: false }),
+    getRate(db),
   ])
   if (!r) notFound()
   const signed = await signPaths(db, [r.image_path])
@@ -41,6 +43,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </div>
         <h1 className="q-h1" style={{ fontSize: 34 }}>{r.title}</h1>
         <div className="q-price" style={{ fontSize: 40 }}>Q$ {formatQ(r.cost)}</div>
+        {r.usd_price != null && (
+          <div className="q-small q-dim">${Number(r.usd_price).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} × {rate} Q$/$</div>
+        )}
         {r.status === 'available' && (
           short > 0 ? (
             <>
@@ -53,7 +58,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      <ProductActions reward={r} imageSrc={img} canBuy={r.status === 'available' && balance >= 0 && short <= 0} />
+      <ProductActions reward={r} rate={rate} imageSrc={img} canBuy={r.status === 'available' && balance >= 0 && short <= 0} />
 
       {r.notes && <p className="q-dim" style={{ whiteSpace: 'pre-wrap' }}>{r.notes}</p>}
 

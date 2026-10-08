@@ -23,7 +23,7 @@ export function ProductImage({ p }: { p: Product }) {
   )
 }
 
-export default function ShopGrid({ products, balance }: { products: Product[]; balance: number }) {
+export default function ShopGrid({ products, balance, rate }: { products: Product[]; balance: number; rate: number }) {
   const [adding, setAdding] = useState(false)
   const [cat, setCat] = useState<string>('all')
   const shown = products.filter(p => p.status === 'available' && (cat === 'all' || p.category === cat))
@@ -54,6 +54,7 @@ export default function ShopGrid({ products, balance }: { products: Product[]; b
                 <div className="q-product-body">
                   <div className="q-product-title">{p.title}</div>
                   <div className="q-price">Q$ {formatQ(p.cost)}</div>
+                  {p.usd_price != null && <div className="q-tiny q-faint">${Number(p.usd_price).toLocaleString('en-US')}</div>}
                   {pct < 1 ? (
                     <div className="q-bar" style={{ height: 3, marginTop: 'auto' }}><i style={{ width: `${pct * 100}%` }} /></div>
                   ) : (
@@ -81,7 +82,7 @@ export default function ShopGrid({ products, balance }: { products: Product[]; b
       )}
 
       <Sheet open={adding} onClose={() => setAdding(false)} title="add to shop">
-        <RewardForm onDone={() => setAdding(false)} />
+        <RewardForm rate={rate} onDone={() => setAdding(false)} />
       </Sheet>
     </>
   )

@@ -286,6 +286,7 @@ export type QReward = {
   repeatable: boolean
   cooldown_days: number | null
   url: string | null
+  usd_price: number | null
   image_path: string | null
   image_url: string | null
   notes: string | null

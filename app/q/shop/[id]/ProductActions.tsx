@@ -9,7 +9,17 @@ import { toast } from '../../_components/Toast'
 import RewardForm from '../RewardForm'
 import { buyReward, removeRewardImage, retireReward } from '../actions'
 
-export default function ProductActions({ reward: r, imageSrc, canBuy }: { reward: QReward; imageSrc: string | null; canBuy: boolean }) {
+export default function ProductActions({
+  reward: r,
+  rate,
+  imageSrc,
+  canBuy,
+}: {
+  reward: QReward
+  rate: number
+  imageSrc: string | null
+  canBuy: boolean
+}) {
   const [editing, setEditing] = useState(false)
   const [pending, start] = useTransition()
   const router = useRouter()
@@ -44,7 +54,7 @@ export default function ProductActions({ reward: r, imageSrc, canBuy }: { reward
       </div>
 
       <Sheet open={editing} onClose={() => setEditing(false)} title="edit">
-        <RewardForm r={r} imageSrc={imageSrc} onDone={() => setEditing(false)} />
+        <RewardForm r={r} rate={rate} imageSrc={imageSrc} onDone={() => setEditing(false)} />
         {imageSrc && (
           <button className="q-btn is-block" style={{ marginTop: 10 }} disabled={pending} onClick={() => run(() => removeRewardImage(r.id), () => setEditing(false))}>
             remove picture
