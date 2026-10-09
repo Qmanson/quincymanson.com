@@ -3,21 +3,22 @@ import { qPage } from '@/lib/q/db'
 import { DOMAIN_INFO } from '@/lib/q/domains'
 import { loadMissionViews } from '@/lib/q/missions'
 import { viewLogs } from '@/lib/q/logview'
-import { eventValue, loadEvents, loadPeople, loadProjects, loadWork } from '@/lib/q/loaders'
-import { addDays, today } from '@/lib/q/time'
+import { loadEventTags, loadGatherings, loadOrgs, loadPeople, loadProjects, loadWork } from '@/lib/q/loaders'
+import { orgStats, socialGraph } from '@/lib/q/social'
+import { workoutStats } from '@/lib/q/workouts'
+import { addDays, monthStart, periodStart, quarterStart, today, weekStart, yearStart } from '@/lib/q/time'
 import { DOMAINS, type Domain } from '@/lib/q/types'
 import AddFab from '../../_components/AddFab'
-import Events from '../../_components/Events'
+import Gatherings from '../../_components/Gatherings'
+import Orgs from '../../_components/Orgs'
+import People from '../../_components/People'
 import Projects from '../../_components/Projects'
 import TaskList from '../../_components/TaskList'
 import Work from '../../_components/Work'
+import Workouts from '../../_components/Workouts'
 import MissionCard from '../../missions/MissionCard'
 import DomainLists from './DomainLists'
-import PeoplePanel from './PeoplePanel'
 import DomainSwipe from './DomainSwipe'
-
-// Domains where the event queue shows by default (others show it once they have one).
-const EVENT_DOMAINS: Domain[] = ['crew', 'city', 'arts']
 
 export default async function DomainPage({ params }: { params: Promise<{ domain: string }> }) {
   const { domain } = await params
@@ -25,19 +26,40 @@ export default async function DomainPage({ params }: { params: Promise<{ domain:
   const d = domain as Domain
   const db = await qPage()
   const t = today()
+  const kind = d === 'crew' ? 'hang' : d === 'city' ? 'event' : null
 
-  const [{ data: routines }, { data: tasks }, { data: logTypes }, { data: missions }, projects, events, people, evValue, work] =
+  const [{ data: routines }, { data: checks }, { data: tasks }, { data: logTypes }, { data: missions }, projects, work] =
     await Promise.all([
       db.from('q_routines').select('*').eq('domain', d).order('sort_order').order('created_at'),
+      db
+        .from('q_routine_checks')
+        .select('routine_id, period_start, status')
+        .in('period_start', [t, weekStart(t), monthStart(t), quarterStart(t), yearStart(t)])
+        .neq('status', 'missed'),
       db.from('q_tasks').select('*').eq('domain', d).or(`done_at.is.null,done_at.gte.${addDays(t, -3)}`),
       db.from('q_log_types').select('*').eq('domain', d).order('sort_order').order('created_at'),
       db.from('q_missions').select('*').eq('domain', d).eq('status', 'active'),
       loadProjects(db, d),
-      loadEvents(db, { domain: d }),
-      loadPeople(db),
-      eventValue(db),
       d === 'admn' ? loadWork(db) : Promise.resolve(null),
     ])
+
+  const [gatherings, people, orgs, tags, social, orgRows, workouts] = await Promise.all([
+    kind ? loadGatherings(db, { kind, doneSince: addDays(t, -60) }) : Promise.resolve([]),
+    kind ? loadPeople(db) : Promise.resolve([]),
+    kind ? loadOrgs(db) : Promise.resolve([]),
+    kind ? loadEventTags(db, kind) : Promise.resolve([]),
+    d === 'crew' ? socialGraph(db) : Promise.resolve(null),
+    d === 'city' ? orgStats(db) : Promise.resolve(null),
+    d === 'body' ? workoutStats(db) : Promise.resolve(null),
+  ])
+
+  // a routine is done if it has a check for the period containing today
+  const doneIds = (routines ?? [])
+    .filter(r => {
+      const p = r.cadence === 'interval' ? t : periodStart(r.cadence, t)
+      return (checks ?? []).some(c => c.routine_id === r.id && c.period_start === p)
+    })
+    .map(r => r.id)
 
   const typeIds = (logTypes ?? []).map(lt => lt.id)
   const { data: logs } = typeIds.length
@@ -60,13 +82,14 @@ export default async function DomainPage({ params }: { params: Promise<{ domain:
       {(missions ?? []).map(m => <MissionCard key={m.id} m={m} v={views.get(m.id)} compact />)}
 
       {work && <Work {...work} />}
-      {(EVENT_DOMAINS.includes(d) || events.length > 0) && (
-        <Events events={events} people={people} domain={d} value={evValue} today={t} />
-      )}
-      <TaskList tasks={tasks ?? []} today={t} projects={projectRefs} />
+      {kind && <Gatherings kind={kind} items={gatherings} people={people} orgs={orgs} tags={tags} />}
+      {social && <People stats={social.stats} edges={social.edges} />}
+      {orgRows && <Orgs orgs={orgRows} />}
+
       <Projects projects={projects} domain={d} today={t} />
-      <DomainLists routines={routines ?? []} logTypes={logTypes ?? []} logs={logViews} />
-      {d === 'crew' && <PeoplePanel db={db} />}
+      <TaskList tasks={tasks ?? []} today={t} projects={projectRefs} />
+      <DomainLists routines={routines ?? []} doneIds={doneIds} logTypes={logTypes ?? []} logs={logViews} />
+      {workouts && <Workouts workouts={workouts} />}
       <AddFab domain={d} projects={projectRefs} />
     </main>
   )

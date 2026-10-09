@@ -86,7 +86,7 @@ export type QTask = {
   created_at: string
 }
 
-export const LOG_KINDS = ['basic', 'lift', 'run', 'substance', 'movie', 'book', 'album', 'event', 'photo'] as const
+export const LOG_KINDS = ['basic', 'lift', 'run', 'substance', 'movie', 'book', 'album', 'event', 'photo', 'sleep'] as const
 export type LogKind = (typeof LOG_KINDS)[number]
 export type MediaKind = 'movie' | 'book' | 'album'
 
@@ -99,6 +99,7 @@ export type QLogType = {
   kind: LogKind
   unit: string | null
   value: number
+  value_per_unit: number | null
   icon: string | null
   active: boolean
   sort_order: number
@@ -142,6 +143,8 @@ export type QLogPerson = {
 export type QWorkout = {
   id: string
   name: string
+  value_per_rep: number
+  max_weight: number | null
   created_at: string
 }
 
@@ -319,7 +322,11 @@ export type QState = {
 
 export type QEvent = {
   id: string
+  kind: 'hang' | 'event'
   domain: Domain
+  org_id: string | null
+  tags: string[]
+  done_at: string | null
   title: string
   happens_on: string | null
   notes: string | null
@@ -328,7 +335,15 @@ export type QEvent = {
   created_at: string
 }
 
-export type QEventPerson = { event_id: string; person_id: string }
+export type QEventPerson = { event_id: string; person_id: string; note: string | null }
+
+export type QOrg = {
+  id: string
+  name: string
+  url: string | null
+  notes: string | null
+  created_at: string
+}
 
 export type QJob = {
   id: string
@@ -352,7 +367,8 @@ export type QShift = {
 }
 
 export type QTables = {
-  q_events: QTable<QEvent, 'id' | 'domain' | 'status' | 'created_at'>
+  q_events: QTable<QEvent, 'id' | 'kind' | 'domain' | 'tags' | 'status' | 'created_at'>
+  q_orgs: QTable<QOrg, 'id' | 'created_at'>
   q_event_people: QTable<QEventPerson>
   q_jobs: QTable<QJob, 'id' | 'wage' | 'q_per_hour' | 'active' | 'created_at'>
   q_shifts: QTable<QShift, 'id' | 'status' | 'created_at'>
@@ -366,7 +382,7 @@ export type QTables = {
   q_logs: QTable<QLog, 'id' | 'logged_on' | 'data' | 'tags' | 'created_at'>
   q_media: QTable<QMedia, 'id' | 'created_at'>
   q_log_people: QTable<QLogPerson>
-  q_workouts: QTable<QWorkout, 'id' | 'created_at'>
+  q_workouts: QTable<QWorkout, 'id' | 'value_per_rep' | 'created_at'>
   q_people: QTable<QPerson, 'id' | 'circle' | 'created_at'>
   q_interactions: QTable<QInteraction, 'id' | 'happened_on' | 'created_at'>
   q_interaction_people: QTable<QInteractionPerson>

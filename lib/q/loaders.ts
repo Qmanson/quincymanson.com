@@ -13,31 +13,65 @@ export async function loadPeople(db: DB) {
   return data ?? []
 }
 
-/** Planned events (optionally one domain / only up to a date) with their people. */
-export async function loadEvents(db: DB, opts: { domain?: Domain; until?: string } = {}) {
-  let q = db.from('q_events').select('*').eq('status', 'planned')
-  if (opts.domain) q = q.eq('domain', opts.domain)
-  if (opts.until) q = q.lte('happens_on', opts.until)
-  const { data: events } = await q
-  const list: QEvent[] = events ?? []
-  if (!list.length) return []
-  const [{ data: links }, people] = await Promise.all([
-    db.from('q_event_people').select('event_id, person_id').in('event_id', list.map(e => e.id)),
-    loadPeople(db),
+/**
+ * Hangs / events with their people (and each person's note) and org.
+ * Planned ones always; done ones from `doneSince` on (if given).
+ */
+export async function loadGatherings(
+  db: DB,
+  opts: { kind?: 'hang' | 'event'; until?: string; doneSince?: string; personId?: string; orgId?: string } = {},
+) {
+  let planned = db.from('q_events').select('*').eq('status', 'planned')
+  let done = db.from('q_events').select('*').eq('status', 'done').order('happens_on', { ascending: false }).limit(60)
+  if (opts.kind) { planned = planned.eq('kind', opts.kind); done = done.eq('kind', opts.kind) }
+  if (opts.until) planned = planned.or(`happens_on.lte.${opts.until},happens_on.is.null`)
+  if (opts.doneSince) done = done.gte('happens_on', opts.doneSince)
+  if (opts.orgId) { planned = planned.eq('org_id', opts.orgId); done = done.eq('org_id', opts.orgId) }
+
+  let personEvents: string[] | null = null
+  if (opts.personId) {
+    const { data } = await db.from('q_event_people').select('event_id').eq('person_id', opts.personId)
+    personEvents = (data ?? []).map(d => d.event_id)
+    if (!personEvents.length) return []
+    planned = planned.in('id', personEvents)
+    done = done.in('id', personEvents)
+  }
+
+  const [{ data: p }, { data: d }] = await Promise.all([
+    planned,
+    opts.doneSince || opts.personId || opts.orgId ? done : Promise.resolve({ data: [] as QEvent[] }),
   ])
-  const name = new Map(people.map(p => [p.id, p.name]))
+  const list: QEvent[] = [...(p ?? []), ...(d ?? [])]
+  if (!list.length) return []
+
+  const orgIds = [...new Set(list.map(e => e.org_id).filter((x): x is string => !!x))]
+  const [{ data: links }, people, { data: orgs }] = await Promise.all([
+    db.from('q_event_people').select('event_id, person_id, note').in('event_id', list.map(e => e.id)),
+    loadPeople(db),
+    orgIds.length ? db.from('q_orgs').select('id, name').in('id', orgIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ])
+  const name = new Map(people.map(x => [x.id, x.name]))
+  const orgName = new Map((orgs ?? []).map(o => [o.id, o]))
   return list.map(e => ({
     ...e,
+    org: e.org_id ? orgName.get(e.org_id) ?? null : null,
     people: (links ?? [])
       .filter(l => l.event_id === e.id)
-      .map(l => ({ id: l.person_id, name: name.get(l.person_id) ?? '?' })),
+      .map(l => ({ id: l.person_id, name: name.get(l.person_id) ?? '?', note: l.note })),
   }))
 }
 
-/** Q$ an event pays when it's done (from the "event" log type). */
-export async function eventValue(db: DB): Promise<number> {
-  const { data } = await db.from('q_log_types').select('value').eq('kind', 'event').order('created_at').limit(1).maybeSingle()
-  return data?.value ?? 0
+export async function loadOrgs(db: DB) {
+  const { data } = await db.from('q_orgs').select('id, name').order('name')
+  return data ?? []
+}
+
+/** Tags used on hangs / events, most used first. */
+export async function loadEventTags(db: DB, kind: 'hang' | 'event') {
+  const { data } = await db.from('q_events').select('tags').eq('kind', kind).limit(300)
+  const counts = new Map<string, number>()
+  for (const r of data ?? []) for (const t of r.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1)
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t).slice(0, 20)
 }
 
 export async function loadProjects(db: DB, domain?: Domain) {

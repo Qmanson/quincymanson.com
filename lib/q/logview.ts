@@ -95,6 +95,16 @@ export async function viewLogs(db: DB, logs: QLog[], types: QLogType[]): Promise
           detail = [m.creator, m.year].filter(Boolean).join(' · ')
         }
         break
+      case 'sleep': {
+        const d = data<{ bed: string; wake: string }>(l)
+        const ampm = (t?: string) => {
+          if (!t) return '?'
+          const h = Number(t.slice(0, 2))
+          return `${h % 12 || 12}:${t.slice(3, 5)}${h < 12 ? 'am' : 'pm'}`
+        }
+        detail = `${ampm(d.bed)} → ${ampm(d.wake)}${l.amount ? ` · ${l.amount}h` : ''}`
+        break
+      }
       case 'event':
         title = data<{ title: string | null }>(l).title || 'event'
         break

@@ -17,11 +17,13 @@ import {
 import QForm from './Form'
 import { unwrap } from '@/lib/q/act'
 import { DomainPicker, Seg } from './Pickers'
-import { LiftRows, MediaPicker, PeoplePicker, PhotoInput, Stars, TagInput } from './log/inputs'
+import { LiftRows, MediaPicker, PhotoInput, Stars, TagInput } from './log/inputs'
 
 type Done = { onDone?: () => void }
 
 // ── task ────────────────────────────────────────────────────
+
+const NEW = '__new'
 
 export function TaskForm({
   task,
@@ -37,6 +39,7 @@ export function TaskForm({
 }) {
   const [value, setValue] = useState(task?.value ?? TASK_SIZES.S)
   const [due, setDue] = useState(task?.due_date ?? '')
+  const [proj, setProj] = useState(task?.project_id ?? projectId ?? '')
   const sizes = Object.keys(TASK_SIZES) as (keyof typeof TASK_SIZES)[]
   return (
     <QForm action={task ? updateTask.bind(null, task.id) : createTask} onDone={onDone}>
@@ -73,18 +76,16 @@ export function TaskForm({
           <input name="due_date" type="date" value={due} onChange={e => setDue(e.target.value)} />
         </label>
       </div>
-      {projects.length > 0 && (
-        <label className="q-field">
-          project
-          <select name="project_id" defaultValue={task?.project_id ?? projectId ?? ''}>
-            <option value="">— none —</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.title} · {p.domain}</option>)}
-          </select>
-        </label>
-      )}
-      {projects.length === 0 && (task?.project_id || projectId) && (
-        <input type="hidden" name="project_id" value={task?.project_id ?? projectId} />
-      )}
+      <div className="q-field">
+        project
+        <select value={proj} onChange={e => setProj(e.target.value)} name={proj === NEW ? undefined : 'project_id'}>
+          <option value="">— none —</option>
+          {projects.map(p => <option key={p.id} value={p.id}>{p.title} · {p.domain}</option>)}
+          {!projects.some(p => p.id === proj) && proj && proj !== NEW && <option value={proj}>this project</option>}
+          <option value={NEW}>+ new project…</option>
+        </select>
+        {proj === NEW && <input name="new_project" required placeholder="project name" />}
+      </div>
       <label className="q-field">
         notes
         <textarea name="notes" rows={2} defaultValue={task?.notes ?? ''} />
@@ -169,7 +170,7 @@ const KIND_OPTS: { value: LogKind; label: string }[] = [
   { value: 'movie', label: 'film' },
   { value: 'book', label: 'book' },
   { value: 'album', label: 'album' },
-  { value: 'event', label: 'event + people' },
+  { value: 'sleep', label: 'sleep times' },
   { value: 'photo', label: 'photo' },
   { value: 'substance', label: 'substances' },
 ]
@@ -201,6 +202,12 @@ export function LogTypeForm({ logType, domain, onDone }: Done & { logType?: QLog
           <input name="value" type="number" inputMode="numeric" defaultValue={logType?.value ?? 20} />
         </label>
       </div>
+      {(kind === 'basic' || kind === 'run') && (
+        <label className="q-field">
+          + Q$ per unit (e.g. 1 per minute)
+          <input name="value_per_unit" type="number" inputMode="decimal" step="any" defaultValue={logType?.value_per_unit ?? ''} placeholder="—" />
+        </label>
+      )}
     </QForm>
   )
 }
@@ -225,7 +232,17 @@ export function LogForm({ logType, onDone }: Done & { logType: QLogType }) {
   )
 
   return (
-    <QForm action={addLog} onDone={onDone} submit={`log${logType.value ? ` +${logType.value}` : ''}`}>
+    <QForm
+      action={addLog}
+      onDone={onDone}
+      submit={
+        logType.value_per_unit
+          ? `log · +${logType.value_per_unit} per ${logType.unit ?? 'unit'}`
+          : k === 'lift'
+            ? 'log · Q$ from reps × weight'
+            : `log${logType.value ? ` +${logType.value}` : ''}`
+      }
+    >
       <input type="hidden" name="log_type_id" value={logType.id} />
 
       {k === 'basic' && (
@@ -240,6 +257,26 @@ export function LogForm({ logType, onDone }: Done & { logType: QLogType }) {
             {day}
           </div>
           <label className="q-field">note<textarea name="note" rows={2} autoFocus={!logType.unit} /></label>
+        </>
+      )}
+
+      {k === 'sleep' && (
+        <>
+          <div className="q-form-row">
+            <label className="q-field">
+              went to sleep
+              <input name="bed" type="time" required defaultValue="23:30" />
+            </label>
+            <label className="q-field">
+              woke up
+              <input name="wake" type="time" required defaultValue="07:30" />
+            </label>
+          </div>
+          <label className="q-field">
+            day you woke up
+            <input name="logged_on" type="date" defaultValue={today()} />
+          </label>
+          <label className="q-field">note<textarea name="note" rows={2} placeholder="dreams, how rested…" /></label>
         </>
       )}
 
@@ -291,15 +328,6 @@ export function LogForm({ logType, onDone }: Done & { logType: QLogType }) {
         </>
       )}
 
-      {k === 'event' && (
-        <>
-          <label className="q-field">what<input name="title" placeholder="chicago local music night" autoFocus /></label>
-          <div className="q-field">who was there<PeoplePicker people={aux.people} /></div>
-          <div className="q-field">tags<TagInput name="tags" suggestions={aux.tags} /></div>
-          {day}
-          <label className="q-field">note<textarea name="note" rows={2} /></label>
-        </>
-      )}
 
       {k === 'photo' && (
         <>

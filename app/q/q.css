@@ -548,3 +548,61 @@ html[data-q-sheet] .q-fab { display: none; }
 .q-urg-head.is-asap { color: var(--danger); }
 .q-urg-head.is-soon { color: var(--warn); }
 .q-urg-head.is-whenever { color: var(--faint); }
+
+/* ── interaction model ───────────────────────────────────────
+   only the box ticks; the row body opens details or nudges the box */
+.q-app .q-box-hit {
+  flex: none; align-self: stretch;
+  display: grid; place-items: center;
+  padding: 0 6px 0 12px !important; min-width: 50px;
+}
+.q-app .q-check-body {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+  min-height: 52px; padding: 8px 12px 8px 4px; text-align: left;
+  transition: background 0.12s;
+}
+.q-app .q-check-body:active { background: rgba(122, 162, 255, 0.08); }
+.q-row-meta { display: flex !important; gap: 8px; align-items: center; flex-wrap: wrap; }
+.q-chev { color: var(--faint); font-size: 18px; flex: none; }
+.q-box.is-nudged { animation: q-nudge 0.4s ease-out; }
+@keyframes q-nudge {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.25); border-color: var(--phosphor); box-shadow: 0 0 12px rgba(124,255,178,.6); }
+  60% { transform: scale(0.92); }
+}
+.q-box { transition: transform 0.12s; }
+.q-box-hit:active .q-box { transform: scale(0.85); }
+
+/* everything tappable gives way under the thumb */
+.q-app a, .q-app button { transition: transform 0.08s ease-out, background 0.12s, opacity 0.12s; }
+.q-app a:active, .q-app button:active:not(:disabled) { transform: scale(0.97); }
+.q-app .q-row:active, .q-app .q-check-body:active { transform: none; }
+
+/* toast with undo */
+.q-toast { display: flex; align-items: center; gap: 10px; white-space: nowrap; max-width: calc(100vw - 32px); }
+.q-toast.has-undo { pointer-events: auto; padding-right: 6px; }
+.q-toast-label { font-family: var(--font-q-mono), monospace; font-size: 12px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+.q-app .q-toast-undo {
+  font-family: var(--font-q-mono), monospace !important; font-size: 12px !important;
+  padding: 4px 10px !important; border-radius: 999px !important;
+  border: 1px solid currentColor !important; color: inherit !important;
+}
+
+/* sub-headings inside a panel */
+.q-sub-head { padding: 10px 12px 2px; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+
+.q-app .q-unfold {
+  display: block; width: 100%; padding: 14px 12px !important;
+  text-align: center; font-size: 12px !important; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--phosphor) !important; border-top: 1px dashed var(--line) !important;
+}
+.q-person-note { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); }
+
+.q-graph { display: block; width: 100%; max-width: 360px; margin: 6px auto 0; overflow: visible; }
+.q-graph a:active circle { r: 10; }
+.q-file {
+  width: 100%; min-height: 220px; resize: vertical;
+  font-family: var(--font-q-mono), monospace !important; font-size: 14px !important; line-height: 1.5;
+}
+.q-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }

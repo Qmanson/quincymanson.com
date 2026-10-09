@@ -31,8 +31,8 @@ export function Stars({ name, initial = null }: { name: string; initial?: number
 
 // ── tags ────────────────────────────────────────────────────
 
-export function TagInput({ name, suggestions = [] }: { name: string; suggestions?: string[] }) {
-  const [tags, setTags] = useState<string[]>([])
+export function TagInput({ name, suggestions = [], initial = [] }: { name: string; suggestions?: string[]; initial?: string[] }) {
+  const [tags, setTags] = useState<string[]>(initial)
   const [draft, setDraft] = useState('')
 
   function add(t: string) {

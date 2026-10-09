@@ -6,10 +6,10 @@ import { useState } from 'react'
 
 const TABS = [
   { href: '/q', icon: '◉', label: 'today', match: (p: string) => p === '/q' },
-  { href: '/q/domains', icon: '◇', label: 'life', match: (p: string) => p.startsWith('/q/domains') || p.startsWith('/q/d/') },
+  { href: '/q/domains', icon: '◇', label: 'life', match: (p: string) => p.startsWith('/q/domains') || p.startsWith('/q/d/') || /^\/q\/(p|person|org|job|workout)\//.test(p) },
   { href: '/q/missions', icon: '★', label: 'missions', match: (p: string) => p.startsWith('/q/missions') },
   { href: '/q/shop', icon: '$', label: 'shop', match: (p: string) => p.startsWith('/q/shop') },
-  { href: '/q/more', icon: '≡', label: 'more', match: (p: string) => p.startsWith('/q/more') || p.startsWith('/q/review') || p.startsWith('/q/ledger') },
+  { href: '/q/more', icon: '≡', label: 'more', match: (p: string) => p.startsWith('/q/more') || p.startsWith('/q/review') || p.startsWith('/q/ledger') || p.startsWith('/q/history') },
 ]
 
 export default function TabBar() {

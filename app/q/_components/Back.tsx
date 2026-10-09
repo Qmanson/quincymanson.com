@@ -11,6 +11,9 @@ function parentOf(path: string): string {
   if (path.startsWith('/q/job/')) return '/q/d/admn'
   if (path.startsWith('/q/shop/')) return '/q/shop'
   if (path.startsWith('/q/review/') || path.startsWith('/q/ledger')) return '/q/more'
+  if (path.startsWith('/q/person/')) return '/q/d/crew'
+  if (path.startsWith('/q/org/')) return '/q/d/city'
+  if (path.startsWith('/q/workout/')) return '/q/d/body'
   return '/q'
 }
 

@@ -7,6 +7,7 @@ import { settle } from '@/lib/q/ledger'
 import { lateValue, missPenalty, TASK_SIZES } from '@/lib/q/points'
 import { addDays, periodEnd, periodStart, today } from '@/lib/q/time'
 import { BUCKET, saveMedia, type MediaHit } from '@/lib/q/media'
+import { liftPoints } from '@/lib/q/lift'
 import type { Database } from '@/lib/types'
 import { DOMAINS, LOG_KINDS, URGENCIES, type Urgency, type Cadence, type Domain, type Crop, type LiftSet, type LogKind } from '@/lib/q/types'
 
@@ -179,6 +180,15 @@ export const doLate = act(async function doLate(checkId: string): Promise<number
 
 // ── tasks ───────────────────────────────────────────────────
 
+/** project_id from the form, creating the project first if a new name was typed. */
+async function projectFor(db: Awaited<ReturnType<typeof qAction>>, f: FormData, d: Domain): Promise<string | null> {
+  const name = str(f, 'new_project')
+  if (!name) return str(f, 'project_id')
+  const { data, error } = await db.from('q_projects').insert({ title: name, domain: d, status: 'active', start_date: today() }).select('id').single()
+  if (error) throw error
+  return data.id
+}
+
 function urgency(f: FormData): Urgency {
   const u = str(f, 'urgency')
   return u && (URGENCIES as readonly string[]).includes(u) ? (u as Urgency) : 'whenever'
@@ -195,7 +205,7 @@ export const createTask = act(async function createTask(f: FormData) {
     value,
     urgency: urgency(f),
     due_date: str(f, 'due_date'),
-    project_id: str(f, 'project_id'),
+    project_id: await projectFor(db, f, domain(f)),
   })
   if (error) throw error
   done()
@@ -210,7 +220,7 @@ export const updateTask = act(async function updateTask(id: string, f: FormData)
     value: int(f, 'value') ?? TASK_SIZES.S,
     urgency: urgency(f),
     due_date: str(f, 'due_date'),
-    project_id: str(f, 'project_id'),
+    project_id: await projectFor(db, f, domain(f)),
   }).eq('id', id)
   if (error) throw error
   done()
@@ -250,6 +260,7 @@ export const createLogType = act(async function createLogType(f: FormData) {
     kind: logKind(f),
     unit: str(f, 'unit'),
     value: int(f, 'value') ?? 0,
+    value_per_unit: num(f, 'value_per_unit'),
   })
   if (error) throw error
   done()
@@ -263,6 +274,7 @@ export const updateLogType = act(async function updateLogType(id: string, f: For
     kind: logKind(f),
     unit: str(f, 'unit'),
     value: int(f, 'value') ?? 0,
+    value_per_unit: num(f, 'value_per_unit'),
   }).eq('id', id)
   if (error) throw error
   done()
@@ -308,8 +320,26 @@ export const addLog = act(async function addLog(f: FormData): Promise<number> {
     tags: tags(f),
   }
 
+  let q = lt.value
+  const perUnit = Number(lt.value_per_unit ?? 0)
+
   switch (lt.kind) {
+    case 'basic':
+      if (perUnit && row.amount) q += Math.round(Number(row.amount) * perUnit)
+      break
+    case 'sleep': {
+      const bed = str(f, 'bed')
+      const wake = str(f, 'wake')
+      if (!bed || !wake) throw new Error('bed and wake times')
+      const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
+      let slept = mins(wake) - mins(bed)
+      if (slept <= 0) slept += 24 * 60
+      row.amount = Math.round((slept / 60) * 100) / 100
+      row.data = { bed, wake }
+      break
+    }
     case 'run':
+      if (perUnit && row.amount) q += Math.round(Number(row.amount) * perUnit)
       row.note = null
       row.data = { seconds: duration(str(f, 'time')) }
       break
@@ -318,6 +348,9 @@ export const addLog = act(async function addLog(f: FormData): Promise<number> {
       if (!sets.length) throw new Error('add at least one workout')
       const names = [...new Set(sets.map(s => s.workout.trim().toLowerCase()))]
       await db.from('q_workouts').upsert(names.map(name => ({ name })), { onConflict: 'name', ignoreDuplicates: true })
+      const { data: ws } = await db.from('q_workouts').select('*').in('name', names)
+      const byName = new Map((ws ?? []).map(w => [w.name, w]))
+      q = Math.round(sets.reduce((sum, s) => sum + liftPoints(s, byName.get(s.workout.trim().toLowerCase())), 0))
       row.amount = null
       row.note = null
       row.data = { sets: sets.map(s => ({ ...s, workout: s.workout.trim().toLowerCase() })) }
@@ -355,23 +388,11 @@ export const addLog = act(async function addLog(f: FormData): Promise<number> {
   const { data: log, error: e } = await db.from('q_logs').insert(row).select('id').single()
   if (e) throw e
 
-  if (lt.kind === 'event') {
-    const ids = json<string[]>(f, 'people_ids') ?? []
-    const newNames = (json<string[]>(f, 'new_people') ?? []).map(n => n.trim()).filter(Boolean)
-    if (newNames.length) {
-      const { data: made } = await db.from('q_people').insert(newNames.map(name => ({ name }))).select('id')
-      ids.push(...(made ?? []).map(p => p.id))
-    }
-    if (ids.length) {
-      await db.from('q_log_people').insert([...new Set(ids)].map(person_id => ({ log_id: log.id, person_id })))
-    }
-  }
-
-  if (lt.value) {
-    await settle(db, { source: 'log', source_id: log.id, domain: lt.domain, note: lt.name, occurred_on: logged_on }, lt.value)
+  if (q) {
+    await settle(db, { source: 'log', source_id: log.id, domain: lt.domain, note: lt.name, occurred_on: logged_on }, q)
   }
   done()
-  return lt.value
+  return q
 })
 
 export const deleteLog = act(async function deleteLog(id: string) {
@@ -398,4 +419,31 @@ export const logFormData = act(async function logFormData(logTypeId: string) {
     people: people ?? [],
     tags: [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([t]) => t),
   }
+})
+
+export const updateWorkout = act(async function updateWorkout(id: string, f: FormData) {
+  const db = await qAction()
+  const { error } = await db
+    .from('q_workouts')
+    .update({
+      name: required(f, 'name').toLowerCase(),
+      value_per_rep: num(f, 'value_per_rep') ?? 1,
+      max_weight: num(f, 'max_weight'),
+    })
+    .eq('id', id)
+  if (error) throw error
+  done()
+})
+
+/** Last checks for a routine, newest first — for its history sheet. */
+export const routineHistory = act(async function routineHistory(id: string) {
+  const db = await qAction()
+  const { data, error } = await db
+    .from('q_routine_checks')
+    .select('period_start, status, done_at')
+    .eq('routine_id', id)
+    .order('period_start', { ascending: false })
+    .limit(60)
+  if (error) throw error
+  return data
 })

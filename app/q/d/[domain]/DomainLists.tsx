@@ -3,36 +3,42 @@
 import { useState, useTransition } from 'react'
 import type { QLogType, QRoutine } from '@/lib/q/types'
 import type { LogView } from '@/lib/q/logview'
-import { missPenalty, starText } from '@/lib/q/points'
+import { starText } from '@/lib/q/points'
 import { cropStyle } from '@/lib/q/crop'
 import { relativeDay } from '@/lib/q/time'
 import Sheet from '../../_components/Sheet'
-import { LogForm, LogTypeForm, RoutineForm } from '../../_components/forms'
+import { LogForm, LogTypeForm } from '../../_components/forms'
 import { toast } from '../../_components/Toast'
 import { unwrap } from '@/lib/q/act'
 import { Cover } from '../../_components/log/inputs'
-import { deleteLog, setLogTypeActive, setRoutineActive } from '../../actions'
+import RoutineRow, { RoutineSheet } from '../../_components/RoutineRow'
+import { deleteLog, setLogTypeActive } from '../../actions'
 
 const CADENCE_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'interval'] as const
+const CADENCE_HEAD = {
+  daily: 'every day', weekly: 'every week', monthly: 'every month',
+  quarterly: 'every quarter', yearly: 'every year', interval: 'every few days',
+} as const
 
-type Edit =
-  | { kind: 'routine'; item: QRoutine }
-  | { kind: 'logType'; item: QLogType }
-  | { kind: 'log'; item: QLogType }
-  | null
+type Edit = { kind: 'logType'; item: QLogType } | { kind: 'log'; item: QLogType } | null
 
 export default function DomainLists({
   routines,
+  doneIds,
   logTypes,
   logs,
 }: {
   routines: QRoutine[]
+  /** routines already done for their current period */
+  doneIds: string[]
   logTypes: QLogType[]
   logs: LogView[]
 }) {
   const [edit, setEdit] = useState<Edit>(null)
+  const [pausedOpen, setPausedOpen] = useState<QRoutine | null>(null)
   const [pending, start] = useTransition()
   const close = () => setEdit(null)
+  const done = new Set(doneIds)
 
   function run(fn: () => Promise<unknown>) {
     start(async () => {
@@ -46,44 +52,42 @@ export default function DomainLists({
   return (
     <>
       <section className="q-panel">
-        <div className="q-panel-title"><span>▸ <b>routines</b></span><span>{active.length}</span></div>
+        <div className="q-panel-title"><span>▸ <b>routines</b></span><span>tap one for its history</span></div>
         {active.length === 0 && <p className="q-empty">none yet</p>}
         {CADENCE_ORDER.map(c => {
           const rs = active.filter(r => r.cadence === c)
           if (!rs.length) return null
           return (
             <div key={c}>
-              <div className="q-tiny q-faint" style={{ padding: '8px 12px 0' }}>{c === 'interval' ? 'every n days' : c}</div>
+              <div className="q-sub-head">{CADENCE_HEAD[c]}</div>
               {rs.map(r => (
-                <button key={r.id} type="button" className="q-row" onClick={() => setEdit({ kind: 'routine', item: r })}>
-                  <span className="q-row-main">
-                    <span className="q-row-title" style={{ display: 'block' }}>{r.title}</span>
-                    <span className="q-row-sub">
-                      miss −{missPenalty(r)}{r.cadence === 'interval' ? ` · every ${r.interval_days}d` : ''}
-                    </span>
-                  </span>
-                  <span className="q-value">+{r.value}</span>
-                </button>
+                <RoutineRow
+                  key={r.id}
+                  r={r}
+                  done={done.has(r.id)}
+                  showDomain={false}
+                  sub={r.cadence === 'interval' ? <span>every {r.interval_days}d</span> : undefined}
+                />
               ))}
             </div>
           )
         })}
         {paused.length > 0 && (
           <>
-            <div className="q-tiny q-faint" style={{ padding: '8px 12px 0' }}>paused</div>
+            <div className="q-sub-head">paused</div>
             {paused.map(r => (
-              <button key={r.id} type="button" className="q-row is-done" onClick={() => setEdit({ kind: 'routine', item: r })}>
-                <span className="q-row-main"><span className="q-row-title" style={{ display: 'block' }}>{r.title}</span></span>
-                <span className="q-value">+{r.value}</span>
+              <button key={r.id} type="button" className="q-row is-done" onClick={() => setPausedOpen(r)}>
+                <span className="q-row-main"><span className="q-row-title">{r.title}</span></span>
+                <span className="q-chev">›</span>
               </button>
             ))}
           </>
         )}
+        {pausedOpen && <RoutineSheet r={pausedOpen} open onClose={() => setPausedOpen(null)} />}
       </section>
 
-
       <section className="q-panel">
-        <div className="q-panel-title"><span>▸ <b>logs</b></span></div>
+        <div className="q-panel-title"><span>▸ <b>logs</b></span><span>tap to log</span></div>
         {logTypes.length > 0 ? (
           <div className="q-chips">
             {logTypes.map(lt => (
@@ -104,7 +108,7 @@ export default function DomainLists({
             )}
             <span className="q-row-main" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span className="q-row-title">
-                {l.kind === 'photo' || l.kind === 'basic' || l.kind === 'run' || l.kind === 'lift' || l.kind === 'substance'
+                {l.kind === 'photo' || l.kind === 'basic' || l.kind === 'run' || l.kind === 'lift' || l.kind === 'substance' || l.kind === 'sleep'
                   ? l.type
                   : l.title}
               </span>
@@ -118,6 +122,7 @@ export default function DomainLists({
             <button
               type="button"
               className="q-faint q-small"
+              style={{ padding: '4px 8px' }}
               disabled={pending}
               onClick={() => confirm('delete this log?') && run(() => deleteLog(l.id))}
             >
@@ -127,32 +132,11 @@ export default function DomainLists({
         ))}
       </section>
 
-      <Sheet open={edit?.kind === 'routine'} onClose={close} title="edit routine">
-        {edit?.kind === 'routine' && (
-          <>
-            <RoutineForm routine={edit.item} onDone={close} />
-            <button
-              className="q-btn is-block"
-              style={{ marginTop: 10 }}
-              disabled={pending}
-              onClick={() => run(() => setRoutineActive(edit.item.id, !edit.item.active))}
-            >
-              {edit.item.active ? 'pause (no more misses)' : 'resume from today'}
-            </button>
-          </>
-        )}
-      </Sheet>
-
-
       <Sheet open={edit?.kind === 'log'} onClose={close} title={edit?.kind === 'log' ? `log ${edit.item.name}` : ''}>
         {edit?.kind === 'log' && (
           <>
             <LogForm logType={edit.item} onDone={close} />
-            <button
-              className="q-btn is-block"
-              style={{ marginTop: 10 }}
-              onClick={() => setEdit({ kind: 'logType', item: edit.item })}
-            >
+            <button className="q-btn is-block" style={{ marginTop: 10 }} onClick={() => setEdit({ kind: 'logType', item: edit.item })}>
               edit log type
             </button>
           </>

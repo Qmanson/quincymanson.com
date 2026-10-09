@@ -66,3 +66,7 @@ export const THEME_BONUS = 1.25
 export function starText(r: number): string {
   return '★'.repeat(Math.floor(r)) + (r % 1 ? '½' : '')
 }
+
+/** Hanging out with friends vs going to an organization's event. */
+export const HANG_VALUE = 15
+export const EVENT_VALUE = 30

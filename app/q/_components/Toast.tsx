@@ -4,28 +4,55 @@ import { useEffect, useState } from 'react'
 
 const EVENT = 'q:toast'
 
-/** Flash a Q$ change (or any short message) above the tab bar. */
-export function toast(msg: number | string) {
-  if (msg === 0) return
-  window.dispatchEvent(new CustomEvent(EVENT, { detail: msg }))
+type Detail = { msg: number | string; label?: string; undo?: () => void }
+
+/**
+ * Flash a Q$ change (or any short message) above the tab bar. Pass a label
+ * to say what changed, and undo to offer a one-tap revert.
+ */
+export function toast(msg: number | string, opts: { label?: string; undo?: () => void } = {}) {
+  if (msg === 0 && !opts.label) return
+  window.dispatchEvent(new CustomEvent<Detail>(EVENT, { detail: { msg, ...opts } }))
 }
 
 export default function Toaster() {
-  const [msg, setMsg] = useState<{ text: string; neg: boolean; key: number } | null>(null)
+  const [t, setT] = useState<(Detail & { key: number }) | null>(null)
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
     function onToast(e: Event) {
-      const d = (e as CustomEvent<number | string>).detail
-      const text = typeof d === 'number' ? `${d > 0 ? '+' : '−'}${Math.abs(d)} Q$` : d
-      setMsg({ text, neg: typeof d === 'number' && d < 0, key: Date.now() })
+      const d = (e as CustomEvent<Detail>).detail
+      setT({ ...d, key: Date.now() })
       clearTimeout(timer)
-      timer = setTimeout(() => setMsg(null), 1400)
+      timer = setTimeout(() => setT(null), d.undo ? 4000 : 1600)
     }
     window.addEventListener(EVENT, onToast)
     return () => { window.removeEventListener(EVENT, onToast); clearTimeout(timer) }
   }, [])
 
-  if (!msg) return null
-  return <div key={msg.key} className={`q-toast ${msg.neg ? 'is-neg' : ''}`}>{msg.text}</div>
+  if (!t) return null
+  const n = typeof t.msg === 'number' ? t.msg : null
+  const neg = n !== null && n < 0
+  const amount = n !== null && n !== 0 ? `${n > 0 ? '+' : '−'}${Math.abs(n)} Q$` : null
+  const text = typeof t.msg === 'string' ? t.msg : null
+
+  return (
+    <div key={t.key} className={`q-toast ${neg ? 'is-neg' : ''} ${t.undo ? 'has-undo' : ''}`}>
+      {t.label && <span className="q-toast-label">{t.label}</span>}
+      {amount && <span>{amount}</span>}
+      {text && <span>{text}</span>}
+      {t.undo && (
+        <button
+          type="button"
+          className="q-toast-undo"
+          onClick={() => {
+            t.undo?.()
+            setT(null)
+          }}
+        >
+          undo
+        </button>
+      )}
+    </div>
+  )
 }

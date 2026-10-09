@@ -61,6 +61,7 @@ export default async function More() {
       </section>
 
       <section className="q-panel">
+        <Link href="/q/history" className="q-row"><span className="q-row-main">history</span><span className="q-dim">→</span></Link>
         <Link href="/q/ledger" className="q-row"><span className="q-row-main">ledger</span><span className="q-dim">→</span></Link>
         <Link href="/" className="q-row"><span className="q-row-main">public site</span><span className="q-dim">↗</span></Link>
         <form action={signOut}>
